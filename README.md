@@ -38,11 +38,42 @@ export COPILOT_GITHUB_TOKEN=github_pat_...
 
 ---
 
-## Build & run
+## Development
+
+### One-time setup (per machine)
+
+**1. Create a self-signed code-signing certificate**
+
+This prevents macOS from re-prompting for Keychain access on every recompile.
+
+1. Open **Keychain Access** → menu bar: **Keychain Access → Certificate Assistant → Create a Certificate…**
+2. Fill in:
+   - **Name:** `AiUsageBar Dev` ← exact, case-sensitive
+   - **Identity Type:** Self Signed Root
+   - **Certificate Type:** Code Signing
+3. Click **Create** → **Done**
+
+The cert stays in your login keychain and is never committed to the repo.
+
+**2. Run `make dev` for the first time**
 
 ```bash
-cargo run            # dev
-cargo build --release
+make dev
+```
+
+macOS will prompt twice:
+- *"codesign wants to access key 'AiUsageBar Dev'"* → enter your macOS password, click **Allow**
+- *"aiusagebar wants to access 'Claude Code-credentials'"* → click **Always Allow**
+
+From this point on, `make dev` starts the app with no dialogs.
+
+### Daily workflow
+
+```bash
+make dev                 # build + sign + run (no Keychain prompts)
+cargo build --release    # release binary
+cargo check              # fast type-check
+cargo clippy             # lint
 ```
 
 Place a 32×32 PNG at `icons/app_icon.png` — app runs with a placeholder if missing.
