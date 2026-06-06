@@ -82,7 +82,7 @@ struct UsageResponse {
 
 #[derive(Deserialize)]
 struct WindowData {
-    used_percentage: f32,
+    utilization: f32,
     resets_at: String,
 }
 
@@ -91,7 +91,7 @@ fn parse_response(body: &str) -> Result<Vec<LimitWindow>, String> {
     Ok(vec![
         LimitWindow {
             name: "5h session".to_string(),
-            percent_used: Some(resp.five_hour.used_percentage),
+            percent_used: Some(resp.five_hour.utilization),
             limit: None,
             remaining: None,
             resets_at: Some(resp.five_hour.resets_at),
@@ -99,7 +99,7 @@ fn parse_response(body: &str) -> Result<Vec<LimitWindow>, String> {
         },
         LimitWindow {
             name: "7d weekly".to_string(),
-            percent_used: Some(resp.seven_day.used_percentage),
+            percent_used: Some(resp.seven_day.utilization),
             limit: None,
             remaining: None,
             resets_at: Some(resp.seven_day.resets_at),
@@ -131,6 +131,9 @@ impl UsageProvider for ClaudeProvider {
             return UsageState::Stale(format!("Expired on {} — run: claude login", date));
         }
         let ua = get_user_agent();
+        eprintln!("[debug] token: {}...", &creds.access_token[..20.min(creds.access_token.len())]);
+        eprintln!("[debug] expires_at_ms: {}", creds.expires_at_ms);
+        eprintln!("[debug] user-agent: {}", ua);
         match crate::http::get(USAGE_URL, &creds.access_token, &[("User-Agent", ua)]) {
             Ok(body) => match parse_response(&body) {
                 Ok(windows) => {
@@ -192,8 +195,8 @@ mod tests {
     #[test]
     fn parse_valid_response() {
         let body = r#"{
-            "five_hour": {"used_percentage": 39.0, "resets_at": "2026-06-06T14:00:00Z"},
-            "seven_day":  {"used_percentage": 15.0, "resets_at": "2026-06-10T08:00:00Z"}
+            "five_hour": {"utilization": 39.0, "resets_at": "2026-06-06T14:00:00Z"},
+            "seven_day":  {"utilization": 15.0, "resets_at": "2026-06-10T08:00:00Z"}
         }"#;
         let windows = super::parse_response(body).unwrap();
         assert_eq!(windows.len(), 2);
