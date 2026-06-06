@@ -8,6 +8,10 @@ fn plist_path() -> Option<std::path::PathBuf> {
 }
 
 fn plist_content(binary_path: &str) -> String {
+    let safe_path = binary_path
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -17,7 +21,7 @@ fn plist_content(binary_path: &str) -> String {
     <string>{LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{binary_path}</string>
+        <string>{safe_path}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -57,6 +61,7 @@ mod tests {
         let xml = plist_content("/opt/homebrew/bin/aiusagebar");
         assert!(xml.contains("<string>com.mttpla.aiusagebar</string>"));
         assert!(xml.contains("<string>/opt/homebrew/bin/aiusagebar</string>"));
+        assert!(xml.contains("<array>\n        <string>/opt/homebrew/bin/aiusagebar</string>"));
         assert!(xml.contains("<true/>"));
         let keep_alive_pos = xml.find("KeepAlive").unwrap();
         assert!(xml[keep_alive_pos..].contains("<false/>"));
