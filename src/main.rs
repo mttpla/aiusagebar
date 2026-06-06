@@ -1,3 +1,5 @@
+mod http;
+mod keychain;
 mod provider;
 
 use tray_icon::{
