@@ -98,6 +98,10 @@ fn main() {
     #[cfg(target_os = "macos")]
     set_accessory_policy();
 
+    if let Err(e) = launch_at_login::enable() {
+        eprintln!("[launch_at_login] {e}");
+    }
+
     let event_loop = EventLoop::new().expect("failed to create event loop");
     let icon = load_icon();
     let claude = ClaudeProvider::new();
