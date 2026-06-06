@@ -25,7 +25,7 @@ impl App {
         let menu = Menu::new();
         match state {
             UsageState::NotConfigured => {
-                menu.append(&MenuItem::new(format!("{}: non configurato", name), false, None)).unwrap();
+                menu.append(&MenuItem::new(format!("{}: not configured", name), false, None)).unwrap();
             }
             UsageState::Stale(msg) => {
                 menu.append(&MenuItem::new(format!("{} ⚠  {}", name, msg), false, None))
@@ -52,8 +52,8 @@ impl App {
                 }
             }
         }
-        let item_refresh = MenuItem::new("Aggiorna", true, None);
-        let item_quit = MenuItem::new("Esci", true, None);
+        let item_refresh = MenuItem::new("Refresh", true, None);
+        let item_quit = MenuItem::new("Quit", true, None);
         menu.append(&item_refresh).unwrap();
         menu.append(&item_quit).unwrap();
         let id_refresh = item_refresh.id().clone();
@@ -104,7 +104,7 @@ fn main() {
     #[cfg(target_os = "macos")]
     set_accessory_policy();
 
-    let event_loop = EventLoop::new().expect("Impossibile creare event loop");
+    let event_loop = EventLoop::new().expect("failed to create event loop");
     let icon = load_icon();
     let claude = ClaudeProvider::new();
     let (initial_menu, id_refresh, id_quit) = App::build_menu(claude.name(), &UsageState::NotConfigured);
@@ -114,10 +114,10 @@ fn main() {
         .with_tooltip("AIUsageBar")
         .with_icon(icon)
         .build()
-        .expect("Impossibile creare la tray icon");
+        .expect("failed to create tray icon");
 
     let mut app = App { tray, id_quit, id_refresh, claude };
-    event_loop.run_app(&mut app).expect("Errore nell'event loop");
+    event_loop.run_app(&mut app).expect("event loop error");
 }
 
 #[cfg(target_os = "macos")]
@@ -134,7 +134,7 @@ fn load_icon() -> tray_icon::Icon {
     let icon_path = std::path::Path::new("icons/app_icon.png");
     let (rgba, width, height) = if icon_path.exists() {
         let img = image::open(icon_path)
-            .expect("Impossibile aprire icons/app_icon.png")
+            .expect("failed to open icons/app_icon.png")
             .into_rgba8();
         let (w, h) = img.dimensions();
         (img.into_raw(), w, h)
@@ -147,5 +147,5 @@ fn load_icon() -> tray_icon::Icon {
         }
         (pixels, size, size)
     };
-    tray_icon::Icon::from_rgba(rgba, width, height).expect("Impossibile creare l'icona")
+    tray_icon::Icon::from_rgba(rgba, width, height).expect("failed to create icon")
 }

@@ -128,7 +128,7 @@ impl UsageProvider for ClaudeProvider {
         };
         if is_expired(creds.expires_at_ms) {
             let date = format_expiry_date(creds.expires_at_ms);
-            return UsageState::Stale(format!("Scaduto dal {} — esegui: claude login", date));
+            return UsageState::Stale(format!("Expired on {} — run: claude login", date));
         }
         let ua = get_user_agent();
         match crate::http::get(USAGE_URL, &creds.access_token, &[("User-Agent", ua)]) {
@@ -140,7 +140,7 @@ impl UsageProvider for ClaudeProvider {
                 Err(e) => UsageState::Error(format!("Parse error: {}", e)),
             },
             Err(HttpError::Unauthorized) => {
-                UsageState::Stale("Token rifiutato — esegui: claude login".to_string())
+                UsageState::Stale("Token rejected — run: claude login".to_string())
             }
             Err(HttpError::RateLimited) => {
                 self.last_ok
