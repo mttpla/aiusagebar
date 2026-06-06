@@ -1,5 +1,6 @@
 mod http;
 mod keychain;
+mod launch_at_login;
 mod provider;
 
 use provider::claude::ClaudeProvider;
