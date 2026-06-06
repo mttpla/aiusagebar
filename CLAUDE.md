@@ -11,11 +11,23 @@ cargo check               # fast type-check without linking
 cargo clippy              # lint
 ```
 
-No test suite yet. Manual acceptance: idle CPU ~0% (`Activity Monitor`), all three providers render correct states.
+12 unit tests. Manual acceptance: idle CPU ~0% (`Activity Monitor`), all three providers render correct states.
 
 ## Architecture
 
-macOS menu bar app (tray-icon + winit event loop). Currently at **Step 1** of the implementation plan — skeleton only (`src/main.rs`). Steps 2–6 from `IMPLEMENTATION.md` are not yet built.
+macOS menu bar app (tray-icon + winit event loop). **Plan 1 complete** — Claude provider live, showing real usage data in the menu. Codex and Copilot providers not yet built. UI polish is a separate plan.
+
+### Current module structure
+
+```
+src/
+  main.rs              — event loop, tray setup, dynamic menu from providers
+  http.rs              — generic GET helper, HttpError (reused by all providers)
+  keychain.rs          — macOS Keychain generic-password reader
+  provider/
+    mod.rs             — UsageProvider trait, UsageState, LimitWindow types
+    claude.rs          — reads Keychain / ~/.claude/.credentials.json, calls api.anthropic.com
+```
 
 ### Crates
 
@@ -23,25 +35,13 @@ macOS menu bar app (tray-icon + winit event loop). Currently at **Step 1** of th
 |---|---|
 | `tray-icon`, `winit` | menu bar + event loop |
 | `image` | load PNG icon |
-| `reqwest` (blocking) | HTTP |
+| `reqwest` (blocking, rustls-tls) | HTTP |
 | `serde`, `serde_json` | parse JSON responses and auth files |
 | `security-framework` | macOS Keychain |
 | `chrono` | parse/format reset timestamps |
 | `dirs` | resolve `~` paths |
 
-### Planned module structure
-
-```
-src/
-  main.rs          — event loop, tray setup, polling tick
-  provider/
-    mod.rs         — UsageProvider trait, UsageState, LimitWindow types
-    codex.rs       — reads ~/.codex/auth.json, calls chatgpt.com endpoint
-    claude.rs      — reads Keychain / ~/.claude/.credentials.json, calls api.anthropic.com
-    copilot.rs     — token priority chain, calls api.github.com/copilot_internal/user
-```
-
-### Core types (not yet implemented)
+### Core types (implemented)
 
 ```rust
 pub struct LimitWindow {
@@ -49,7 +49,7 @@ pub struct LimitWindow {
     pub percent_used: Option<f32>,
     pub limit: Option<u32>,
     pub remaining: Option<u32>,
-    pub resets_at: Option<DateTime<Utc>>,
+    pub resets_at: Option<String>,
     pub unlimited: bool,
 }
 
@@ -66,7 +66,7 @@ pub trait UsageProvider: Send + Sync {
 }
 ```
 
-UI iterates `Vec<Box<dyn UsageProvider>>`, renders per-provider menu sections, drives icon tint from worst `percent_used`.
+UI iterates `Vec<Box<dyn UsageProvider>>`, renders per-provider menu sections.
 
 ### Hard constraints (read before touching auth or network code)
 
