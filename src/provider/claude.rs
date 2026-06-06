@@ -42,7 +42,7 @@ pub fn is_expired(expires_at_ms: u64) -> bool {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    expires_at_ms < now_ms
+    expires_at_ms <= now_ms
 }
 
 pub fn format_expiry_date(expires_at_ms: u64) -> String {
