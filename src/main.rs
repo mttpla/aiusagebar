@@ -1,3 +1,5 @@
+mod provider;
+
 use tray_icon::{
     menu::{Menu, MenuEvent, MenuItem},
     TrayIconBuilder, TrayIconEvent,
