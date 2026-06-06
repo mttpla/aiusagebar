@@ -88,15 +88,8 @@ impl ApplicationHandler for App {
             }
         }
 
-        if let Ok(tray_event) = TrayIconEvent::receiver().try_recv() {
-            if let tray_icon::TrayIconEvent::Click {
-                button: tray_icon::MouseButton::Left,
-                ..
-            } = tray_event
-            {
-                self.refresh();
-            }
-        }
+        // Drain tray events; no action needed — menu shows automatically on click.
+        let _ = TrayIconEvent::receiver().try_recv();
     }
 }
 
