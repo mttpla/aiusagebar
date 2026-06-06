@@ -4,14 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+### One-time dev setup (per machine)
+
+Create a self-signed code-signing certificate to avoid repeated Keychain prompts:
+
+1. Open Keychain Access → Certificate Assistant → Create a Certificate
+2. Name: `AiUsageBar Dev`, Identity Type: Self Signed Root, Certificate Type: Code Signing
+3. Click Create → Done
+
+This is required once per machine. Not committed to the repo.
+
+### Daily commands
+
 ```bash
-cargo run                 # run in dev (icon loads from icons/app_icon.png relative to CWD)
+make dev                  # build + sign + run in dev (no repeated Keychain prompts after first run)
 cargo build --release     # release binary
 cargo check               # fast type-check without linking
 cargo clippy              # lint
 ```
 
-12 unit tests. Manual acceptance: idle CPU ~0% (`Activity Monitor`), all three providers render correct states.
+12 unit tests. Manual acceptance: idle CPU ~0% (`Activity Monitor`), Claude provider renders correct usage state.
 
 ## Architecture
 
