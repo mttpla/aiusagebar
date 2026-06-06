@@ -55,8 +55,12 @@ Minimum polling interval: **180 seconds**. Wrong/missing `User-Agent` = instant 
 **Response (relevant fields):**
 ```json
 {
-  "five_hour": { "used_percentage": 39.0, "resets_at": "2026-06-06T14:00:00Z" },
-  "seven_day":  { "used_percentage": 15.0, "resets_at": "2026-06-10T08:00:00Z" }
+  "five_hour": { "utilization": 44.0, "resets_at": "2026-06-06T19:30:01.307521+00:00" },
+  "seven_day":  { "utilization": 25.0, "resets_at": "2026-06-08T18:00:00.307588+00:00" },
+  "seven_day_oauth_apps": null,
+  "seven_day_opus": null,
+  "seven_day_sonnet": null,
+  "extra_usage": { "is_enabled": false, "monthly_limit": null, "used_credits": null, "utilization": null }
 }
 ```
 
