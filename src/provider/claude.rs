@@ -54,6 +54,107 @@ pub fn format_expiry_date(expires_at_ms: u64) -> String {
     }
 }
 
+use std::sync::{Mutex, OnceLock};
+use crate::http::HttpError;
+use crate::provider::{LimitWindow, UsageState, UsageProvider};
+
+static USER_AGENT: OnceLock<String> = OnceLock::new();
+
+fn get_user_agent() -> &'static str {
+    USER_AGENT.get_or_init(|| {
+        std::process::Command::new("claude")
+            .arg("--version")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .and_then(|s| s.split_whitespace().next().map(|v| format!("claude-code/{}", v)))
+            .unwrap_or_else(|| "claude-code/2.1.153".to_string())
+    })
+}
+
+const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
+
+#[derive(Deserialize)]
+struct UsageResponse {
+    five_hour: WindowData,
+    seven_day: WindowData,
+}
+
+#[derive(Deserialize)]
+struct WindowData {
+    used_percentage: f32,
+    resets_at: String,
+}
+
+fn parse_response(body: &str) -> Result<Vec<LimitWindow>, String> {
+    let resp: UsageResponse = serde_json::from_str(body).map_err(|e| e.to_string())?;
+    Ok(vec![
+        LimitWindow {
+            name: "5h session".to_string(),
+            percent_used: Some(resp.five_hour.used_percentage),
+            limit: None,
+            remaining: None,
+            resets_at: Some(resp.five_hour.resets_at),
+            unlimited: false,
+        },
+        LimitWindow {
+            name: "7d weekly".to_string(),
+            percent_used: Some(resp.seven_day.used_percentage),
+            limit: None,
+            remaining: None,
+            resets_at: Some(resp.seven_day.resets_at),
+            unlimited: false,
+        },
+    ])
+}
+
+pub struct ClaudeProvider {
+    last_ok: Mutex<Option<Vec<LimitWindow>>>,
+}
+
+impl ClaudeProvider {
+    pub fn new() -> Self {
+        Self { last_ok: Mutex::new(None) }
+    }
+}
+
+impl UsageProvider for ClaudeProvider {
+    fn name(&self) -> &'static str { "Anthropic" }
+
+    fn fetch(&self) -> UsageState {
+        let creds = match load_credentials() {
+            None => return UsageState::NotConfigured,
+            Some(c) => c,
+        };
+        if is_expired(creds.expires_at_ms) {
+            let date = format_expiry_date(creds.expires_at_ms);
+            return UsageState::Stale(format!("Scaduto dal {} — esegui: claude login", date));
+        }
+        let ua = get_user_agent();
+        match crate::http::get(USAGE_URL, &creds.access_token, &[("User-Agent", ua)]) {
+            Ok(body) => match parse_response(&body) {
+                Ok(windows) => {
+                    *self.last_ok.lock().unwrap() = Some(windows.clone());
+                    UsageState::Ok(windows)
+                }
+                Err(e) => UsageState::Error(format!("Parse error: {}", e)),
+            },
+            Err(HttpError::Unauthorized) => {
+                UsageState::Stale("Token rifiutato — esegui: claude login".to_string())
+            }
+            Err(HttpError::RateLimited) => {
+                self.last_ok
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .map(UsageState::Ok)
+                    .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()))
+            }
+            Err(HttpError::Other(e)) => UsageState::Error(e),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,5 +187,24 @@ mod tests {
     fn format_expiry_date_known_timestamp() {
         // 1749081600000 ms = 2025-06-05 00:00:00 UTC
         assert_eq!(format_expiry_date(1749081600000), "2025-06-05");
+    }
+
+    #[test]
+    fn parse_valid_response() {
+        let body = r#"{
+            "five_hour": {"used_percentage": 39.0, "resets_at": "2026-06-06T14:00:00Z"},
+            "seven_day":  {"used_percentage": 15.0, "resets_at": "2026-06-10T08:00:00Z"}
+        }"#;
+        let windows = super::parse_response(body).unwrap();
+        assert_eq!(windows.len(), 2);
+        assert_eq!(windows[0].name, "5h session");
+        assert_eq!(windows[0].percent_used, Some(39.0));
+        assert_eq!(windows[1].name, "7d weekly");
+        assert_eq!(windows[1].percent_used, Some(15.0));
+    }
+
+    #[test]
+    fn parse_missing_field_is_error() {
+        assert!(super::parse_response("{}").is_err());
     }
 }
