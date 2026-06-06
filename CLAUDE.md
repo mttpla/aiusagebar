@@ -17,7 +17,19 @@ No test suite yet. Manual acceptance: idle CPU ~0% (`Activity Monitor`), all thr
 
 macOS menu bar app (tray-icon + winit event loop). Currently at **Step 1** of the implementation plan — skeleton only (`src/main.rs`). Steps 2–6 from `IMPLEMENTATION.md` are not yet built.
 
-### Planned module structure (IMPLEMENTATION.md)
+### Crates
+
+| Crate | Use |
+|---|---|
+| `tray-icon`, `winit` | menu bar + event loop |
+| `image` | load PNG icon |
+| `reqwest` (blocking) | HTTP |
+| `serde`, `serde_json` | parse JSON responses and auth files |
+| `security-framework` | macOS Keychain |
+| `chrono` | parse/format reset timestamps |
+| `dirs` | resolve `~` paths |
+
+### Planned module structure
 
 ```
 src/
@@ -31,9 +43,28 @@ src/
 
 ### Core types (not yet implemented)
 
-- `LimitWindow` — one time-bounded usage window (name, percent_used, limit, remaining, resets_at, unlimited)
-- `UsageState` — `NotConfigured | Stale(String) | Ok(Vec<LimitWindow>) | Error(String)`
-- `UsageProvider` trait — `name() -> &'static str`, `fetch() -> UsageState`
+```rust
+pub struct LimitWindow {
+    pub name: String,
+    pub percent_used: Option<f32>,
+    pub limit: Option<u32>,
+    pub remaining: Option<u32>,
+    pub resets_at: Option<DateTime<Utc>>,
+    pub unlimited: bool,
+}
+
+pub enum UsageState {
+    NotConfigured,
+    Stale(String),
+    Ok(Vec<LimitWindow>),
+    Error(String),
+}
+
+pub trait UsageProvider: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn fetch(&self) -> UsageState;
+}
+```
 
 UI iterates `Vec<Box<dyn UsageProvider>>`, renders per-provider menu sections, drives icon tint from worst `percent_used`.
 
