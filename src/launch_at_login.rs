@@ -33,6 +33,18 @@ fn plist_content(binary_path: &str) -> String {
     )
 }
 
+fn uid() -> Result<u32, String> {
+    let out = std::process::Command::new("id")
+        .arg("-u")
+        .output()
+        .map_err(|e| e.to_string())?;
+    String::from_utf8(out.stdout)
+        .map_err(|e| e.to_string())?
+        .trim()
+        .parse::<u32>()
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(debug_assertions)]
 pub fn enable() -> Result<(), String> {
     eprintln!("[launch_at_login] skipped in debug build");
@@ -41,11 +53,42 @@ pub fn enable() -> Result<(), String> {
 
 #[cfg(not(debug_assertions))]
 pub fn enable() -> Result<(), String> {
-    todo!("implement enable")
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let binary = exe.to_str().ok_or("non-UTF8 binary path")?;
+    let plist = plist_path().ok_or("no home directory")?;
+    if let Some(parent) = plist.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&plist, plist_content(binary)).map_err(|e| e.to_string())?;
+    let uid = uid()?;
+    let plist_str = plist.to_str().ok_or("non-UTF8 plist path")?;
+    let out = std::process::Command::new("launchctl")
+        .args(["bootstrap", &format!("gui/{uid}"), plist_str])
+        .output()
+        .map_err(|e| e.to_string())?;
+    // 36 = EALREADY (already bootstrapped) — treat as success
+    let code = out.status.code().unwrap_or(-1);
+    if out.status.success() || code == 36 {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
 }
 
 pub fn disable() -> Result<(), String> {
-    todo!("implement disable")
+    let uid = uid()?;
+    let out = std::process::Command::new("launchctl")
+        .args(["bootout", &format!("gui/{uid}"), LABEL])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        if let Some(p) = plist_path() {
+            let _ = std::fs::remove_file(p);
+        }
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
 }
 
 pub fn is_enabled() -> bool {
