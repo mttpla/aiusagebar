@@ -38,6 +38,9 @@ fn uid() -> Result<u32, String> {
         .arg("-u")
         .output()
         .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(format!("id -u failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
+    }
     String::from_utf8(out.stdout)
         .map_err(|e| e.to_string())?
         .trim()
@@ -71,7 +74,9 @@ pub fn enable() -> Result<(), String> {
     if out.status.success() || code == 36 {
         Ok(())
     } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+        let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let _ = std::fs::remove_file(&plist);
+        Err(if msg.is_empty() { format!("launchctl exited with code {code}") } else { msg })
     }
 }
 
@@ -81,13 +86,15 @@ pub fn disable() -> Result<(), String> {
         .args(["bootout", &format!("gui/{uid}"), LABEL])
         .output()
         .map_err(|e| e.to_string())?;
-    if out.status.success() {
+    let code = out.status.code().unwrap_or(-1);
+    if out.status.success() || code == 36 {
         if let Some(p) = plist_path() {
             let _ = std::fs::remove_file(p);
         }
         Ok(())
     } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+        let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        Err(if msg.is_empty() { format!("launchctl bootout exited with code {code}") } else { msg })
     }
 }
 
