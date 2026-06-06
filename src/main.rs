@@ -21,22 +21,22 @@ struct App {
 }
 
 impl App {
-    fn build_menu(state: &UsageState) -> (Menu, tray_icon::menu::MenuId, tray_icon::menu::MenuId) {
+    fn build_menu(name: &str, state: &UsageState) -> (Menu, tray_icon::menu::MenuId, tray_icon::menu::MenuId) {
         let menu = Menu::new();
         match state {
             UsageState::NotConfigured => {
-                menu.append(&MenuItem::new("Anthropic: non configurato", false, None)).unwrap();
+                menu.append(&MenuItem::new(format!("{}: non configurato", name), false, None)).unwrap();
             }
             UsageState::Stale(msg) => {
-                menu.append(&MenuItem::new(format!("Anthropic ⚠  {}", msg), false, None))
+                menu.append(&MenuItem::new(format!("{} ⚠  {}", name, msg), false, None))
                     .unwrap();
             }
             UsageState::Error(msg) => {
-                menu.append(&MenuItem::new(format!("Anthropic ✕  {}", msg), false, None))
+                menu.append(&MenuItem::new(format!("{} ✕  {}", name, msg), false, None))
                     .unwrap();
             }
             UsageState::Ok(windows) => {
-                menu.append(&MenuItem::new("Anthropic", false, None)).unwrap();
+                menu.append(&MenuItem::new(name, false, None)).unwrap();
                 for w in windows {
                     let pct = w
                         .percent_used
@@ -63,7 +63,7 @@ impl App {
 
     fn refresh(&mut self) {
         let state = self.claude.fetch();
-        let (menu, id_refresh, id_quit) = Self::build_menu(&state);
+        let (menu, id_refresh, id_quit) = Self::build_menu(self.claude.name(), &state);
         self.id_refresh = id_refresh;
         self.id_quit = id_quit;
         self.tray.set_menu(Some(Box::new(menu)));
@@ -107,7 +107,7 @@ fn main() {
     let event_loop = EventLoop::new().expect("Impossibile creare event loop");
     let icon = load_icon();
     let claude = ClaudeProvider::new();
-    let (initial_menu, id_refresh, id_quit) = App::build_menu(&UsageState::NotConfigured);
+    let (initial_menu, id_refresh, id_quit) = App::build_menu(claude.name(), &UsageState::NotConfigured);
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(initial_menu))
