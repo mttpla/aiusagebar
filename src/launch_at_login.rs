@@ -1,5 +1,6 @@
 const LABEL: &str = "com.mttpla.aiusagebar";
 
+#[allow(dead_code)]
 fn plist_path() -> Option<std::path::PathBuf> {
     dirs::home_dir().map(|h| {
         h.join("Library/LaunchAgents")
@@ -7,6 +8,7 @@ fn plist_path() -> Option<std::path::PathBuf> {
     })
 }
 
+#[allow(dead_code)]
 fn plist_content(binary_path: &str) -> String {
     let safe_path = binary_path
         .replace('&', "&amp;")
@@ -33,6 +35,7 @@ fn plist_content(binary_path: &str) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn uid() -> Result<u32, String> {
     let out = std::process::Command::new("id")
         .arg("-u")
