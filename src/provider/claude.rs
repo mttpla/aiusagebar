@@ -62,7 +62,7 @@ static USER_AGENT: OnceLock<String> = OnceLock::new();
 
 fn parse_version(s: &str) -> Option<String> {
     s.split_whitespace()
-        .find(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        .find(|t| t.chars().any(|c| c.is_ascii_digit()))
         .map(|t| t.trim_matches(|c: char| !c.is_ascii_digit() && c != '.').to_string())
         .filter(|t| !t.is_empty())
 }
@@ -230,5 +230,15 @@ mod tests {
     #[test]
     fn parse_version_none_on_empty() {
         assert_eq!(super::parse_version(""), None);
+    }
+
+    #[test]
+    fn parse_version_trims_leading_alpha() {
+        assert_eq!(super::parse_version("v2.1.153"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn parse_version_trims_trailing_suffix() {
+        assert_eq!(super::parse_version("2.1.153-beta"), Some("2.1.153".to_string()));
     }
 }
