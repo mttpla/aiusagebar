@@ -61,9 +61,9 @@ pub fn is_expired(expires_at_ms: u64) -> bool {
 }
 
 pub fn format_expiry_date(expires_at_ms: u64) -> String {
-    use chrono::{TimeZone, Utc};
+    use chrono::{Local, TimeZone};
     let secs = (expires_at_ms / 1000) as i64;
-    match Utc.timestamp_opt(secs, 0) {
+    match Local.timestamp_opt(secs, 0) {
         chrono::LocalResult::Single(dt) => dt.format("%Y-%m-%d").to_string(),
         _ => "?".to_string(),
     }
@@ -210,9 +210,12 @@ mod tests {
     }
 
     #[test]
-    fn format_expiry_date_known_timestamp() {
-        // 1749081600000 ms = 2025-06-05 00:00:00 UTC
-        assert_eq!(format_expiry_date(1749081600000), "2025-06-05");
+    fn format_expiry_date_yyyy_mm_dd_shape() {
+        let s = format_expiry_date(1749081600000);
+        let bytes = s.as_bytes();
+        assert_eq!(bytes.len(), 10, "got {s}");
+        assert_eq!(bytes[4], b'-');
+        assert_eq!(bytes[7], b'-');
     }
 
     #[test]
