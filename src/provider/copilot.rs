@@ -23,7 +23,7 @@ fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
         let Some(percent_remaining) = snap.get("percent_remaining").and_then(|p| p.as_f64()) else {
             continue;
         };
-        let percent_used = 100.0 - percent_remaining as f32;
+        let percent_used = (100.0 - percent_remaining as f32).clamp(0.0, 100.0);
         let limit = snap
             .get("entitlement")
             .and_then(|e| e.as_u64())
@@ -225,5 +225,31 @@ mod tests {
             windows.iter().any(|w| w.percent_used.is_none() && w.name.contains("expired")),
             "sentinel window missing"
         );
+    }
+
+    #[test]
+    fn fetch_other_error_returns_error() {
+        let state = do_copilot_fetch(
+            vec!["tok".to_string()],
+            &|_| Err(HttpError::Other("connection refused".to_string())),
+        );
+        assert!(matches!(state, UsageState::Error(ref s) if s.contains("connection refused")));
+    }
+
+    #[test]
+    fn fetch_200_bad_body_returns_error() {
+        let state = do_copilot_fetch(
+            vec!["tok".to_string()],
+            &|_| Ok("not json".to_string()),
+        );
+        assert!(matches!(state, UsageState::Error(_)));
+    }
+
+    #[test]
+    fn parse_non_object_quota_snapshots_returns_empty() {
+        // Malformed response: quota_snapshots is not an object — treated same as missing
+        let body = r#"{"login":"mttpla","quota_reset_date_utc":"2026-07-01T00:00:00Z","quota_snapshots":42}"#;
+        let windows = parse_copilot_response(body).unwrap();
+        assert_eq!(windows.len(), 0);
     }
 }
