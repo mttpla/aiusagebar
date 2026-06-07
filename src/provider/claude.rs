@@ -142,48 +142,63 @@ impl ClaudeProvider {
     pub fn new() -> Self { Self::default() }
 }
 
+fn do_fetch(
+    creds: CredLoad,
+    http: &dyn Fn(&str) -> Result<String, HttpError>,
+    last_ok: &Mutex<Option<Vec<LimitWindow>>>,
+) -> UsageState {
+    let creds = match creds {
+        CredLoad::NotConfigured => return UsageState::NotConfigured,
+        CredLoad::Malformed(e) => return UsageState::Error(format!("Malformed credentials: {}", e)),
+        CredLoad::Ok(c) => c,
+    };
+    if is_expired(creds.expires_at_ms) {
+        let date = format_expiry_date(creds.expires_at_ms);
+        return UsageState::Stale(format!("Expired on {} — run: claude login", date));
+    }
+    match http(&creds.access_token) {
+        Ok(body) => match parse_response(&body) {
+            Ok(windows) => {
+                let windows = windows.to_vec();
+                *last_ok.lock().unwrap() = Some(windows.clone());
+                UsageState::Ok(windows)
+            }
+            Err(e) => UsageState::Error(format!("Parse error: {}", e)),
+        },
+        Err(HttpError::Unauthorized) => {
+            UsageState::Stale("Token rejected — run: claude login".to_string())
+        }
+        Err(HttpError::RateLimited) => {
+            last_ok
+                .lock()
+                .unwrap()
+                .clone()
+                .map(UsageState::Ok)
+                .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()))
+        }
+        Err(HttpError::Other(e)) => UsageState::Error(e),
+    }
+}
+
 impl UsageProvider for ClaudeProvider {
     fn name(&self) -> &'static str { "Anthropic" }
 
     fn fetch(&self) -> UsageState {
-        let creds = match load_credentials() {
-            CredLoad::NotConfigured => return UsageState::NotConfigured,
-            CredLoad::Malformed(e) => return UsageState::Error(format!("Malformed credentials: {}", e)),
-            CredLoad::Ok(c) => c,
-        };
-        if is_expired(creds.expires_at_ms) {
-            let date = format_expiry_date(creds.expires_at_ms);
-            return UsageState::Stale(format!("Expired on {} — run: claude login", date));
-        }
         let ua = get_user_agent();
-        match crate::http::get(USAGE_URL, &creds.access_token, &[("User-Agent", ua)]) {
-            Ok(body) => match parse_response(&body) {
-                Ok(windows) => {
-                    let windows = windows.to_vec();
-                    *self.last_ok.lock().unwrap() = Some(windows.clone());
-                    UsageState::Ok(windows)
-                }
-                Err(e) => UsageState::Error(format!("Parse error: {}", e)),
-            },
-            Err(HttpError::Unauthorized) => {
-                UsageState::Stale("Token rejected — run: claude login".to_string())
-            }
-            Err(HttpError::RateLimited) => {
-                self.last_ok
-                    .lock()
-                    .unwrap()
-                    .clone()
-                    .map(UsageState::Ok)
-                    .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()))
-            }
-            Err(HttpError::Other(e)) => UsageState::Error(e),
-        }
+        do_fetch(
+            load_credentials(),
+            &|token| crate::http::get(USAGE_URL, token, &[("User-Agent", ua)]),
+            &self.last_ok,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::provider::{LimitWindow, UsageState};
+    use crate::http::HttpError;
+    use std::sync::Mutex;
 
     #[test]
     fn parse_valid_credentials_json() {
@@ -277,5 +292,98 @@ mod tests {
     fn load_result_valid_is_ok() {
         let good = Some(r#"{"claudeAiOauth":{"accessToken":"t","expiresAt":1}}"#.to_string());
         assert!(matches!(super::parse_credentials_payload(good), super::CredLoad::Ok(_)));
+    }
+
+    fn ok_creds() -> CredLoad {
+        CredLoad::Ok(ClaudeCredentials {
+            access_token: "tok".to_string(),
+            expires_at_ms: 9_999_999_999_000,
+        })
+    }
+
+    fn empty_cache() -> Mutex<Option<Vec<LimitWindow>>> {
+        Mutex::new(None)
+    }
+
+    fn valid_body() -> &'static str {
+        r#"{"five_hour":{"utilization":50.0,"resets_at":"2026-12-01T00:00:00Z"},"seven_day":{"utilization":20.0,"resets_at":"2026-12-07T00:00:00Z"}}"#
+    }
+
+    #[test]
+    fn do_fetch_not_configured() {
+        let state = super::do_fetch(CredLoad::NotConfigured, &|_| unreachable!(), &empty_cache());
+        assert_eq!(state, UsageState::NotConfigured);
+    }
+
+    #[test]
+    fn do_fetch_malformed_creds() {
+        let state = super::do_fetch(
+            CredLoad::Malformed("bad json".to_string()),
+            &|_| unreachable!(),
+            &empty_cache(),
+        );
+        assert!(matches!(state, UsageState::Error(ref e) if e.contains("Malformed")));
+    }
+
+    #[test]
+    fn do_fetch_expired_token_returns_stale() {
+        let creds = CredLoad::Ok(ClaudeCredentials {
+            access_token: "tok".to_string(),
+            expires_at_ms: 1_000,
+        });
+        let state = super::do_fetch(creds, &|_| unreachable!(), &empty_cache());
+        assert!(matches!(state, UsageState::Stale(ref s) if s.contains("Expired on")));
+    }
+
+    #[test]
+    fn do_fetch_401_returns_stale() {
+        let state = super::do_fetch(
+            ok_creds(),
+            &|_| Err(HttpError::Unauthorized),
+            &empty_cache(),
+        );
+        assert!(matches!(state, UsageState::Stale(ref s) if s.contains("Token rejected")));
+    }
+
+    #[test]
+    fn do_fetch_429_no_cache_returns_error() {
+        let state = super::do_fetch(
+            ok_creds(),
+            &|_| Err(HttpError::RateLimited),
+            &empty_cache(),
+        );
+        assert!(matches!(state, UsageState::Error(ref s) if s.contains("Rate limited")));
+    }
+
+    #[test]
+    fn do_fetch_429_with_cache_returns_cached_ok() {
+        let cache = Mutex::new(Some(vec![LimitWindow {
+            name: "5h session".to_string(),
+            percent_used: Some(42.0),
+            limit: None,
+            remaining: None,
+            resets_at: None,
+            unlimited: false,
+        }]));
+        let state = super::do_fetch(ok_creds(), &|_| Err(HttpError::RateLimited), &cache);
+        assert!(matches!(state, UsageState::Ok(ref w) if w[0].percent_used == Some(42.0)));
+    }
+
+    #[test]
+    fn do_fetch_200_bad_body_returns_error() {
+        let state = super::do_fetch(
+            ok_creds(),
+            &|_| Ok("garbage".to_string()),
+            &empty_cache(),
+        );
+        assert!(matches!(state, UsageState::Error(ref s) if s.contains("Parse error")));
+    }
+
+    #[test]
+    fn do_fetch_200_valid_returns_ok_and_populates_cache() {
+        let cache = empty_cache();
+        let state = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache);
+        assert!(matches!(state, UsageState::Ok(ref w) if w.len() == 2));
+        assert!(cache.lock().unwrap().is_some(), "cache must be populated after success");
     }
 }
