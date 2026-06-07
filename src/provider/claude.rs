@@ -60,6 +60,13 @@ use crate::provider::{LimitWindow, UsageState, UsageProvider};
 
 static USER_AGENT: OnceLock<String> = OnceLock::new();
 
+fn parse_version(s: &str) -> Option<String> {
+    s.split_whitespace()
+        .find(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        .map(|t| t.trim_matches(|c: char| !c.is_ascii_digit() && c != '.').to_string())
+        .filter(|t| !t.is_empty())
+}
+
 fn get_user_agent() -> &'static str {
     USER_AGENT.get_or_init(|| {
         std::process::Command::new("claude")
@@ -67,7 +74,9 @@ fn get_user_agent() -> &'static str {
             .output()
             .ok()
             .and_then(|o| String::from_utf8(o.stdout).ok())
-            .and_then(|s| s.split_whitespace().next().map(|v| format!("claude-code/{}", v)))
+            .as_deref()
+            .and_then(parse_version)
+            .map(|v| format!("claude-code/{}", v))
             .unwrap_or_else(|| "claude-code/2.1.153".to_string())
     })
 }
@@ -206,5 +215,20 @@ mod tests {
     #[test]
     fn parse_missing_field_is_error() {
         assert!(super::parse_response("{}").is_err());
+    }
+
+    #[test]
+    fn parse_version_first_token_numeric() {
+        assert_eq!(super::parse_version("2.1.153 (Claude Code)"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn parse_version_skips_leading_words() {
+        assert_eq!(super::parse_version("Claude Code 2.1.153"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn parse_version_none_on_empty() {
+        assert_eq!(super::parse_version(""), None);
     }
 }
