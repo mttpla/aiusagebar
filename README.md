@@ -18,6 +18,18 @@ Per-provider states: **Not configured** · **Stale** (renew via official client)
 
 ---
 
+## Icons
+
+Icons by [Font Awesome](https://fontawesome.com) (CC BY 4.0).
+
+| Tray icon | Meaning |
+|---|---|
+| Brain (white) | All AI usage under 80% |
+| Brain + red dot | At least one provider at or above 80% usage |
+| Brain (grey dot) | Data unavailable — not configured, stale, or fetch error |
+
+---
+
 ## Keychain access
 
 Claude token lives in the macOS Keychain (created by Claude Code). First read triggers a system dialog — click **Always Allow** once. Nothing is ever written back.
@@ -75,5 +87,3 @@ cargo build --release    # release binary
 cargo check              # fast type-check
 cargo clippy             # lint
 ```
-
-Place a 32×32 PNG at `icons/app_icon.png` — app runs with a placeholder if missing.
