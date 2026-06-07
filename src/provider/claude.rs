@@ -19,13 +19,25 @@ pub struct ClaudeCredentials {
     pub expires_at_ms: u64,
 }
 
-pub fn load_credentials() -> Option<ClaudeCredentials> {
-    let json = load_credentials_json()?;
-    let file: CredentialsFile = serde_json::from_str(&json).ok()?;
-    Some(ClaudeCredentials {
-        access_token: file.claude_ai_oauth.access_token,
-        expires_at_ms: file.claude_ai_oauth.expires_at,
-    })
+pub enum CredLoad {
+    NotConfigured,
+    Malformed(String),
+    Ok(ClaudeCredentials),
+}
+
+pub fn parse_credentials_payload(json: Option<String>) -> CredLoad {
+    let Some(json) = json else { return CredLoad::NotConfigured; };
+    match serde_json::from_str::<CredentialsFile>(&json) {
+        Ok(file) => CredLoad::Ok(ClaudeCredentials {
+            access_token: file.claude_ai_oauth.access_token,
+            expires_at_ms: file.claude_ai_oauth.expires_at,
+        }),
+        Err(e) => CredLoad::Malformed(e.to_string()),
+    }
+}
+
+pub fn load_credentials() -> CredLoad {
+    parse_credentials_payload(load_credentials_json())
 }
 
 fn load_credentials_json() -> Option<String> {
@@ -132,8 +144,9 @@ impl UsageProvider for ClaudeProvider {
 
     fn fetch(&self) -> UsageState {
         let creds = match load_credentials() {
-            None => return UsageState::NotConfigured,
-            Some(c) => c,
+            CredLoad::NotConfigured => return UsageState::NotConfigured,
+            CredLoad::Malformed(e) => return UsageState::Error(format!("Malformed credentials: {}", e)),
+            CredLoad::Ok(c) => c,
         };
         if is_expired(creds.expires_at_ms) {
             let date = format_expiry_date(creds.expires_at_ms);
@@ -240,5 +253,22 @@ mod tests {
     #[test]
     fn parse_version_trims_trailing_suffix() {
         assert_eq!(super::parse_version("2.1.153-beta"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn load_result_missing_is_not_configured() {
+        assert!(matches!(super::parse_credentials_payload(None), super::CredLoad::NotConfigured));
+    }
+
+    #[test]
+    fn load_result_corrupt_is_malformed() {
+        let bad = Some("{not json".to_string());
+        assert!(matches!(super::parse_credentials_payload(bad), super::CredLoad::Malformed(_)));
+    }
+
+    #[test]
+    fn load_result_valid_is_ok() {
+        let good = Some(r#"{"claudeAiOauth":{"accessToken":"t","expiresAt":1}}"#.to_string());
+        assert!(matches!(super::parse_credentials_payload(good), super::CredLoad::Ok(_)));
     }
 }
