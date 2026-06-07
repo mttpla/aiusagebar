@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 const LABEL: &str = "com.mttpla.aiusagebar";
 
 fn plist_path() -> Option<std::path::PathBuf> {
@@ -83,19 +85,20 @@ pub fn enable() -> Result<(), String> {
 pub fn disable() -> Result<(), String> {
     let uid = uid()?;
     let out = std::process::Command::new("launchctl")
-        .args(["bootout", &format!("gui/{uid}"), LABEL])
+        .args(["bootout", &format!("gui/{uid}/{LABEL}")])
         .output()
         .map_err(|e| e.to_string())?;
     let code = out.status.code().unwrap_or(-1);
-    if out.status.success() || code == 36 {
-        if let Some(p) = plist_path() {
-            let _ = std::fs::remove_file(p);
-        }
+    let result = if out.status.success() || code == 36 || code == 3 {
         Ok(())
     } else {
         let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
         Err(if msg.is_empty() { format!("launchctl bootout exited with code {code}") } else { msg })
+    };
+    if let Some(p) = plist_path() {
+        let _ = std::fs::remove_file(p);
     }
+    result
 }
 
 pub fn is_enabled() -> bool {
