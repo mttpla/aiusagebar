@@ -1,4 +1,7 @@
 use serde::Deserialize;
+use std::sync::{Mutex, OnceLock};
+use crate::http::HttpError;
+use crate::provider::{LimitWindow, UsageState, UsageProvider};
 
 #[derive(Deserialize)]
 struct CredentialsFile {
@@ -19,13 +22,25 @@ pub struct ClaudeCredentials {
     pub expires_at_ms: u64,
 }
 
-pub fn load_credentials() -> Option<ClaudeCredentials> {
-    let json = load_credentials_json()?;
-    let file: CredentialsFile = serde_json::from_str(&json).ok()?;
-    Some(ClaudeCredentials {
-        access_token: file.claude_ai_oauth.access_token,
-        expires_at_ms: file.claude_ai_oauth.expires_at,
-    })
+pub enum CredLoad {
+    NotConfigured,
+    Malformed(String),
+    Ok(ClaudeCredentials),
+}
+
+pub fn parse_credentials_payload(json: Option<String>) -> CredLoad {
+    let Some(json) = json else { return CredLoad::NotConfigured; };
+    match serde_json::from_str::<CredentialsFile>(&json) {
+        Ok(file) => CredLoad::Ok(ClaudeCredentials {
+            access_token: file.claude_ai_oauth.access_token,
+            expires_at_ms: file.claude_ai_oauth.expires_at,
+        }),
+        Err(e) => CredLoad::Malformed(e.to_string()),
+    }
+}
+
+pub fn load_credentials() -> CredLoad {
+    parse_credentials_payload(load_credentials_json())
 }
 
 fn load_credentials_json() -> Option<String> {
@@ -46,19 +61,22 @@ pub fn is_expired(expires_at_ms: u64) -> bool {
 }
 
 pub fn format_expiry_date(expires_at_ms: u64) -> String {
-    use chrono::{TimeZone, Utc};
+    use chrono::{Local, TimeZone};
     let secs = (expires_at_ms / 1000) as i64;
-    match Utc.timestamp_opt(secs, 0) {
+    match Local.timestamp_opt(secs, 0) {
         chrono::LocalResult::Single(dt) => dt.format("%Y-%m-%d").to_string(),
         _ => "?".to_string(),
     }
 }
 
-use std::sync::{Mutex, OnceLock};
-use crate::http::HttpError;
-use crate::provider::{LimitWindow, UsageState, UsageProvider};
-
 static USER_AGENT: OnceLock<String> = OnceLock::new();
+
+fn parse_version(s: &str) -> Option<String> {
+    s.split_whitespace()
+        .find(|t| t.chars().any(|c| c.is_ascii_digit()))
+        .map(|t| t.trim_matches(|c: char| !c.is_ascii_digit() && c != '.').to_string())
+        .filter(|t| !t.is_empty())
+}
 
 fn get_user_agent() -> &'static str {
     USER_AGENT.get_or_init(|| {
@@ -67,7 +85,9 @@ fn get_user_agent() -> &'static str {
             .output()
             .ok()
             .and_then(|o| String::from_utf8(o.stdout).ok())
-            .and_then(|s| s.split_whitespace().next().map(|v| format!("claude-code/{}", v)))
+            .as_deref()
+            .and_then(parse_version)
+            .map(|v| format!("claude-code/{}", v))
             .unwrap_or_else(|| "claude-code/2.1.153".to_string())
     })
 }
@@ -86,9 +106,9 @@ struct WindowData {
     resets_at: String,
 }
 
-fn parse_response(body: &str) -> Result<Vec<LimitWindow>, String> {
+fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
     let resp: UsageResponse = serde_json::from_str(body).map_err(|e| e.to_string())?;
-    Ok(vec![
+    Ok([
         LimitWindow {
             name: "5h session".to_string(),
             percent_used: Some(resp.five_hour.utilization),
@@ -112,10 +132,14 @@ pub struct ClaudeProvider {
     last_ok: Mutex<Option<Vec<LimitWindow>>>,
 }
 
-impl ClaudeProvider {
-    pub fn new() -> Self {
+impl Default for ClaudeProvider {
+    fn default() -> Self {
         Self { last_ok: Mutex::new(None) }
     }
+}
+
+impl ClaudeProvider {
+    pub fn new() -> Self { Self::default() }
 }
 
 impl UsageProvider for ClaudeProvider {
@@ -123,20 +147,19 @@ impl UsageProvider for ClaudeProvider {
 
     fn fetch(&self) -> UsageState {
         let creds = match load_credentials() {
-            None => return UsageState::NotConfigured,
-            Some(c) => c,
+            CredLoad::NotConfigured => return UsageState::NotConfigured,
+            CredLoad::Malformed(e) => return UsageState::Error(format!("Malformed credentials: {}", e)),
+            CredLoad::Ok(c) => c,
         };
         if is_expired(creds.expires_at_ms) {
             let date = format_expiry_date(creds.expires_at_ms);
             return UsageState::Stale(format!("Expired on {} — run: claude login", date));
         }
         let ua = get_user_agent();
-        eprintln!("[debug] token: {}...", &creds.access_token[..20.min(creds.access_token.len())]);
-        eprintln!("[debug] expires_at_ms: {}", creds.expires_at_ms);
-        eprintln!("[debug] user-agent: {}", ua);
         match crate::http::get(USAGE_URL, &creds.access_token, &[("User-Agent", ua)]) {
             Ok(body) => match parse_response(&body) {
                 Ok(windows) => {
+                    let windows = windows.to_vec();
                     *self.last_ok.lock().unwrap() = Some(windows.clone());
                     UsageState::Ok(windows)
                 }
@@ -187,9 +210,12 @@ mod tests {
     }
 
     #[test]
-    fn format_expiry_date_known_timestamp() {
-        // 1749081600000 ms = 2025-06-05 00:00:00 UTC
-        assert_eq!(format_expiry_date(1749081600000), "2025-06-05");
+    fn format_expiry_date_yyyy_mm_dd_shape() {
+        let s = format_expiry_date(1749081600000);
+        let bytes = s.as_bytes();
+        assert_eq!(bytes.len(), 10, "got {s}");
+        assert_eq!(bytes[4], b'-');
+        assert_eq!(bytes[7], b'-');
     }
 
     #[test]
@@ -209,5 +235,47 @@ mod tests {
     #[test]
     fn parse_missing_field_is_error() {
         assert!(super::parse_response("{}").is_err());
+    }
+
+    #[test]
+    fn parse_version_first_token_numeric() {
+        assert_eq!(super::parse_version("2.1.153 (Claude Code)"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn parse_version_skips_leading_words() {
+        assert_eq!(super::parse_version("Claude Code 2.1.153"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn parse_version_none_on_empty() {
+        assert_eq!(super::parse_version(""), None);
+    }
+
+    #[test]
+    fn parse_version_trims_leading_alpha() {
+        assert_eq!(super::parse_version("v2.1.153"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn parse_version_trims_trailing_suffix() {
+        assert_eq!(super::parse_version("2.1.153-beta"), Some("2.1.153".to_string()));
+    }
+
+    #[test]
+    fn load_result_missing_is_not_configured() {
+        assert!(matches!(super::parse_credentials_payload(None), super::CredLoad::NotConfigured));
+    }
+
+    #[test]
+    fn load_result_corrupt_is_malformed() {
+        let bad = Some("{not json".to_string());
+        assert!(matches!(super::parse_credentials_payload(bad), super::CredLoad::Malformed(_)));
+    }
+
+    #[test]
+    fn load_result_valid_is_ok() {
+        let good = Some(r#"{"claudeAiOauth":{"accessToken":"t","expiresAt":1}}"#.to_string());
+        assert!(matches!(super::parse_credentials_payload(good), super::CredLoad::Ok(_)));
     }
 }
