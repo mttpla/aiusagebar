@@ -108,4 +108,36 @@ mod tests {
         let s = UsageState::Ok(vec![window(None)]);
         assert_eq!(IconKind::for_state(&s), IconKind::Normal);
     }
+
+    #[test]
+    fn alert_when_any_window_above_threshold() {
+        let s = UsageState::Ok(vec![window(Some(50.0)), window(Some(90.0))]);
+        assert_eq!(IconKind::for_state(&s), IconKind::Alert);
+    }
+
+    #[test]
+    fn alert_ignores_none_with_high_other() {
+        let s = UsageState::Ok(vec![window(None), window(Some(85.0))]);
+        assert_eq!(IconKind::for_state(&s), IconKind::Alert);
+    }
+
+    #[test]
+    fn normal_when_all_windows_none() {
+        let s = UsageState::Ok(vec![window(None), window(None)]);
+        assert_eq!(IconKind::for_state(&s), IconKind::Normal);
+    }
+
+    #[test]
+    fn alert_when_percent_high_regardless_of_unlimited_flag() {
+        let w = LimitWindow {
+            name: "t".into(),
+            percent_used: Some(90.0),
+            limit: None,
+            remaining: None,
+            resets_at: None,
+            unlimited: true,
+        };
+        let s = UsageState::Ok(vec![w]);
+        assert_eq!(IconKind::for_state(&s), IconKind::Alert);
+    }
 }

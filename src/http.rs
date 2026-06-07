@@ -36,8 +36,6 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<Str
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn shared_client_is_reused() {
         let a = super::client() as *const reqwest::blocking::Client;
