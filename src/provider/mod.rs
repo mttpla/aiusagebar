@@ -10,7 +10,7 @@ pub struct LimitWindow {
     pub unlimited: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UsageState {
     NotConfigured,
     Stale(String),

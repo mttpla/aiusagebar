@@ -1,4 +1,7 @@
 use serde::Deserialize;
+use std::sync::{Mutex, OnceLock};
+use crate::http::HttpError;
+use crate::provider::{LimitWindow, UsageState, UsageProvider};
 
 #[derive(Deserialize)]
 struct CredentialsFile {
@@ -66,10 +69,6 @@ pub fn format_expiry_date(expires_at_ms: u64) -> String {
     }
 }
 
-use std::sync::{Mutex, OnceLock};
-use crate::http::HttpError;
-use crate::provider::{LimitWindow, UsageState, UsageProvider};
-
 static USER_AGENT: OnceLock<String> = OnceLock::new();
 
 fn parse_version(s: &str) -> Option<String> {
@@ -107,9 +106,9 @@ struct WindowData {
     resets_at: String,
 }
 
-fn parse_response(body: &str) -> Result<Vec<LimitWindow>, String> {
+fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
     let resp: UsageResponse = serde_json::from_str(body).map_err(|e| e.to_string())?;
-    Ok(vec![
+    Ok([
         LimitWindow {
             name: "5h session".to_string(),
             percent_used: Some(resp.five_hour.utilization),
@@ -133,10 +132,14 @@ pub struct ClaudeProvider {
     last_ok: Mutex<Option<Vec<LimitWindow>>>,
 }
 
-impl ClaudeProvider {
-    pub fn new() -> Self {
+impl Default for ClaudeProvider {
+    fn default() -> Self {
         Self { last_ok: Mutex::new(None) }
     }
+}
+
+impl ClaudeProvider {
+    pub fn new() -> Self { Self::default() }
 }
 
 impl UsageProvider for ClaudeProvider {
@@ -156,6 +159,7 @@ impl UsageProvider for ClaudeProvider {
         match crate::http::get(USAGE_URL, &creds.access_token, &[("User-Agent", ua)]) {
             Ok(body) => match parse_response(&body) {
                 Ok(windows) => {
+                    let windows = windows.to_vec();
                     *self.last_ok.lock().unwrap() = Some(windows.clone());
                     UsageState::Ok(windows)
                 }
