@@ -83,15 +83,8 @@ impl App {
             .map(|p| (p.name(), p.fetch()))
             .collect();
 
-        let icon_kind = states.iter().fold(IconKind::Normal, |best, (_, s)| {
-            match (best, IconKind::for_state(s)) {
-                (IconKind::Alert, _) | (_, IconKind::Alert) => IconKind::Alert,
-                (IconKind::Unavailable, _) | (_, IconKind::Unavailable) => {
-                    IconKind::Unavailable
-                }
-                _ => IconKind::Normal,
-            }
-        });
+        let state_refs: Vec<&UsageState> = states.iter().map(|(_, s)| s).collect();
+        let icon_kind = IconKind::for_providers(&state_refs);
 
         let refs: Vec<(&str, &UsageState)> =
             states.iter().map(|(n, s)| (*n, s)).collect();

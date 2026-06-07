@@ -22,6 +22,16 @@ impl IconKind {
             _ => IconKind::Unavailable,
         }
     }
+
+    pub fn for_providers(states: &[&UsageState]) -> Self {
+        states.iter().fold(IconKind::Normal, |best, s| {
+            match (best, IconKind::for_state(s)) {
+                (IconKind::Alert, _) | (_, IconKind::Alert) => IconKind::Alert,
+                (IconKind::Unavailable, _) | (_, IconKind::Unavailable) => IconKind::Unavailable,
+                _ => IconKind::Normal,
+            }
+        })
+    }
 }
 
 static ICON_NORMAL_PNG: &[u8] = include_bytes!("../icons/brain_normal.png");
@@ -125,6 +135,39 @@ mod tests {
     fn normal_when_all_windows_none() {
         let s = UsageState::Ok(vec![window(None), window(None)]);
         assert_eq!(IconKind::for_state(&s), IconKind::Normal);
+    }
+
+    #[test]
+    fn fold_alert_beats_error() {
+        let high = UsageState::Ok(vec![window(Some(90.0))]);
+        let err = UsageState::Error("boom".into());
+        assert_eq!(IconKind::for_providers(&[&high, &err]), IconKind::Alert);
+    }
+
+    #[test]
+    fn fold_alert_beats_unavailable_regardless_of_order() {
+        let high = UsageState::Ok(vec![window(Some(85.0))]);
+        let stale = UsageState::Stale("old".into());
+        assert_eq!(IconKind::for_providers(&[&stale, &high]), IconKind::Alert);
+    }
+
+    #[test]
+    fn fold_error_beats_normal() {
+        let ok = UsageState::Ok(vec![window(Some(50.0))]);
+        let err = UsageState::Error("boom".into());
+        assert_eq!(IconKind::for_providers(&[&ok, &err]), IconKind::Unavailable);
+    }
+
+    #[test]
+    fn fold_all_normal() {
+        let a = UsageState::Ok(vec![window(Some(10.0))]);
+        let b = UsageState::Ok(vec![window(Some(30.0))]);
+        assert_eq!(IconKind::for_providers(&[&a, &b]), IconKind::Normal);
+    }
+
+    #[test]
+    fn fold_empty_is_normal() {
+        assert_eq!(IconKind::for_providers(&[]), IconKind::Normal);
     }
 
     #[test]
