@@ -14,6 +14,26 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum IconKind {
+    Normal,
+    Alert,
+    Unavailable,
+}
+
+fn icon_for_state(state: &UsageState) -> IconKind {
+    match state {
+        UsageState::Ok(windows) => {
+            if windows.iter().any(|w| w.percent_used.unwrap_or(0.0) >= 80.0) {
+                IconKind::Alert
+            } else {
+                IconKind::Normal
+            }
+        }
+        _ => IconKind::Unavailable,
+    }
+}
+
 struct App {
     tray: tray_icon::TrayIcon,
     id_quit: tray_icon::menu::MenuId,
@@ -146,4 +166,61 @@ fn load_icon() -> tray_icon::Icon {
         (pixels, size, size)
     };
     tray_icon::Icon::from_rgba(rgba, width, height).expect("failed to create icon")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use provider::{LimitWindow, UsageState};
+
+    fn window(pct: Option<f32>) -> LimitWindow {
+        LimitWindow {
+            name: "test".into(),
+            percent_used: pct,
+            limit: None,
+            remaining: None,
+            resets_at: None,
+            unlimited: false,
+        }
+    }
+
+    #[test]
+    fn icon_normal_when_all_under_threshold() {
+        let state = UsageState::Ok(vec![window(Some(50.0)), window(Some(79.9))]);
+        assert_eq!(icon_for_state(&state), IconKind::Normal);
+    }
+
+    #[test]
+    fn icon_alert_when_any_at_threshold() {
+        let state = UsageState::Ok(vec![window(Some(50.0)), window(Some(80.0))]);
+        assert_eq!(icon_for_state(&state), IconKind::Alert);
+    }
+
+    #[test]
+    fn icon_alert_when_any_over_threshold() {
+        let state = UsageState::Ok(vec![window(Some(95.0))]);
+        assert_eq!(icon_for_state(&state), IconKind::Alert);
+    }
+
+    #[test]
+    fn icon_unavailable_on_error() {
+        assert_eq!(icon_for_state(&UsageState::Error("e".into())), IconKind::Unavailable);
+    }
+
+    #[test]
+    fn icon_unavailable_on_stale() {
+        assert_eq!(icon_for_state(&UsageState::Stale("s".into())), IconKind::Unavailable);
+    }
+
+    #[test]
+    fn icon_unavailable_on_not_configured() {
+        assert_eq!(icon_for_state(&UsageState::NotConfigured), IconKind::Unavailable);
+    }
+
+    #[test]
+    fn icon_normal_when_percent_unknown() {
+        // None percent_used (unlimited window) → treated as 0.0 → Normal
+        let state = UsageState::Ok(vec![window(None)]);
+        assert_eq!(icon_for_state(&state), IconKind::Normal);
+    }
 }
