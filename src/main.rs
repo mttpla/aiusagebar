@@ -6,6 +6,7 @@ mod provider;
 
 use icon::{IconKind, Icons};
 use provider::claude::ClaudeProvider;
+use provider::copilot::CopilotProvider;
 use provider::{UsageProvider, UsageState};
 use tray_icon::{
     menu::{Menu, MenuEvent, MenuItem},
@@ -32,25 +33,36 @@ struct App {
     icons: Icons,
     id_quit: tray_icon::menu::MenuId,
     id_refresh: tray_icon::menu::MenuId,
-    claude: ClaudeProvider,
+    providers: Vec<Box<dyn UsageProvider>>,
 }
 
 impl App {
-    fn build_menu(name: &str, state: &UsageState) -> MenuBuild {
+    fn build_menu(states: &[(&str, &UsageState)]) -> MenuBuild {
         let menu = Menu::new();
-        match state {
-            UsageState::NotConfigured => append_label(&menu, format!("{}: not configured", name)),
-            UsageState::Stale(msg) => append_label(&menu, format!("{} ⚠  {}", name, msg)),
-            UsageState::Error(msg) => append_label(&menu, format!("{} ✕  {}", name, msg)),
-            UsageState::Ok(windows) => {
-                append_label(&menu, name.to_string());
-                for w in windows {
-                    let pct = w
-                        .percent_used
-                        .map(|p| format!("{:.1}%", p))
-                        .unwrap_or_else(|| "∞".to_string());
-                    let reset = w.resets_at.as_deref().unwrap_or("?");
-                    append_label(&menu, format!("  {} — {}  resets {}", w.name, pct, reset));
+        for (name, state) in states {
+            match state {
+                UsageState::NotConfigured => {
+                    append_label(&menu, format!("{}: not configured", name));
+                }
+                UsageState::Stale(msg) => {
+                    append_label(&menu, format!("{} ⚠  {}", name, msg));
+                }
+                UsageState::Error(msg) => {
+                    append_label(&menu, format!("{} ✕  {}", name, msg));
+                }
+                UsageState::Ok(windows) => {
+                    append_label(&menu, name.to_string());
+                    for w in windows {
+                        let pct = w
+                            .percent_used
+                            .map(|p| format!("{:.1}%", p))
+                            .unwrap_or_else(|| "—".to_string());
+                        let reset = w.resets_at.as_deref().unwrap_or("?");
+                        append_label(
+                            &menu,
+                            format!("  {} — {}  resets {}", w.name, pct, reset),
+                        );
+                    }
                 }
             }
         }
@@ -66,13 +78,28 @@ impl App {
     }
 
     fn refresh(&mut self) {
-        let state = self.claude.fetch();
-        let build = Self::build_menu(self.claude.name(), &state);
+        let states: Vec<(&str, UsageState)> = self.providers
+            .iter()
+            .map(|p| (p.name(), p.fetch()))
+            .collect();
+
+        let icon_kind = states.iter().fold(IconKind::Normal, |best, (_, s)| {
+            match (best, IconKind::for_state(s)) {
+                (IconKind::Alert, _) | (_, IconKind::Alert) => IconKind::Alert,
+                (IconKind::Unavailable, _) | (_, IconKind::Unavailable) => {
+                    IconKind::Unavailable
+                }
+                _ => IconKind::Normal,
+            }
+        });
+
+        let refs: Vec<(&str, &UsageState)> =
+            states.iter().map(|(n, s)| (*n, s)).collect();
+        let build = Self::build_menu(&refs);
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
         self.tray.set_menu(Some(Box::new(build.menu)));
-        let kind = IconKind::for_state(&state);
-        self.tray.set_icon(Some(self.icons.get(kind))).ok();
+        self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
     }
 }
 
@@ -84,7 +111,6 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        // Cocoa wakes the loop on tray/menu clicks; try_recv drains queued events.
         event_loop.set_control_flow(ControlFlow::Wait);
 
         if let Ok(ev) = MenuEvent::receiver().try_recv() {
@@ -95,7 +121,6 @@ impl ApplicationHandler for App {
             }
         }
 
-        // Drain tray events; no action needed — menu shows automatically on click.
         let _ = TrayIconEvent::receiver().try_recv();
     }
 }
@@ -108,16 +133,25 @@ fn main() {
         eprintln!("[launch_at_login] {e}");
     }
 
+    let providers: Vec<Box<dyn UsageProvider>> = vec![
+        Box::new(ClaudeProvider::new()),
+        Box::new(CopilotProvider::new()),
+    ];
+
     let event_loop = EventLoop::new().expect("failed to create event loop");
     let icons = Icons::load();
-    let claude = ClaudeProvider::new();
+
     let initial_state = UsageState::NotConfigured;
-    let build = App::build_menu(claude.name(), &initial_state);
+    let initial_refs: Vec<(&str, &UsageState)> = providers
+        .iter()
+        .map(|p| (p.name(), &initial_state))
+        .collect();
+    let build = App::build_menu(&initial_refs);
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(build.menu))
         .with_tooltip("AIUsageBar")
-        .with_icon(icons.get(IconKind::for_state(&initial_state)))
+        .with_icon(icons.get(IconKind::Unavailable))
         .build()
         .expect("failed to create tray icon");
 
@@ -126,7 +160,7 @@ fn main() {
         icons,
         id_quit: build.quit,
         id_refresh: build.refresh,
-        claude,
+        providers,
     };
     event_loop.run_app(&mut app).expect("event loop error");
 }
