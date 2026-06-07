@@ -16,6 +16,17 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
+struct MenuBuild {
+    menu: Menu,
+    refresh: tray_icon::menu::MenuId,
+    quit: tray_icon::menu::MenuId,
+}
+
+fn append_label(menu: &Menu, text: impl Into<String>) {
+    menu.append(&MenuItem::new(text.into(), false, None))
+        .expect("menu append failed");
+}
+
 struct App {
     tray: tray_icon::TrayIcon,
     icons: Icons,
@@ -25,52 +36,41 @@ struct App {
 }
 
 impl App {
-    fn build_menu(name: &str, state: &UsageState) -> (Menu, tray_icon::menu::MenuId, tray_icon::menu::MenuId) {
+    fn build_menu(name: &str, state: &UsageState) -> MenuBuild {
         let menu = Menu::new();
         match state {
-            UsageState::NotConfigured => {
-                menu.append(&MenuItem::new(format!("{}: not configured", name), false, None)).unwrap();
-            }
-            UsageState::Stale(msg) => {
-                menu.append(&MenuItem::new(format!("{} ⚠  {}", name, msg), false, None))
-                    .unwrap();
-            }
-            UsageState::Error(msg) => {
-                menu.append(&MenuItem::new(format!("{} ✕  {}", name, msg), false, None))
-                    .unwrap();
-            }
+            UsageState::NotConfigured => append_label(&menu, format!("{}: not configured", name)),
+            UsageState::Stale(msg) => append_label(&menu, format!("{} ⚠  {}", name, msg)),
+            UsageState::Error(msg) => append_label(&menu, format!("{} ✕  {}", name, msg)),
             UsageState::Ok(windows) => {
-                menu.append(&MenuItem::new(name, false, None)).unwrap();
+                append_label(&menu, name.to_string());
                 for w in windows {
                     let pct = w
                         .percent_used
                         .map(|p| format!("{:.1}%", p))
                         .unwrap_or_else(|| "∞".to_string());
                     let reset = w.resets_at.as_deref().unwrap_or("?");
-                    menu.append(&MenuItem::new(
-                        format!("  {} — {}  resets {}", w.name, pct, reset),
-                        false,
-                        None,
-                    ))
-                    .unwrap();
+                    append_label(&menu, format!("  {} — {}  resets {}", w.name, pct, reset));
                 }
             }
         }
         let item_refresh = MenuItem::new("Refresh", true, None);
         let item_quit = MenuItem::new("Quit", true, None);
-        menu.append(&item_refresh).unwrap();
-        menu.append(&item_quit).unwrap();
-        let id_refresh = item_refresh.id().clone();
-        let id_quit = item_quit.id().clone();
-        (menu, id_refresh, id_quit)
+        menu.append(&item_refresh).expect("menu append failed");
+        menu.append(&item_quit).expect("menu append failed");
+        MenuBuild {
+            refresh: item_refresh.id().clone(),
+            quit: item_quit.id().clone(),
+            menu,
+        }
     }
 
     fn refresh(&mut self) {
         let state = self.claude.fetch();
-        let (menu, id_refresh, id_quit) = Self::build_menu(self.claude.name(), &state);
-        self.id_refresh = id_refresh;
-        self.id_quit = id_quit;
-        self.tray.set_menu(Some(Box::new(menu)));
+        let build = Self::build_menu(self.claude.name(), &state);
+        self.id_refresh = build.refresh;
+        self.id_quit = build.quit;
+        self.tray.set_menu(Some(Box::new(build.menu)));
         let kind = IconKind::for_state(&state);
         self.tray.set_icon(Some(self.icons.get(kind))).ok();
     }
@@ -84,6 +84,7 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        // Cocoa wakes the loop on tray/menu clicks; try_recv drains queued events.
         event_loop.set_control_flow(ControlFlow::Wait);
 
         if let Ok(ev) = MenuEvent::receiver().try_recv() {
@@ -111,16 +112,22 @@ fn main() {
     let icons = Icons::load();
     let claude = ClaudeProvider::new();
     let initial_state = UsageState::NotConfigured;
-    let (initial_menu, id_refresh, id_quit) = App::build_menu(claude.name(), &initial_state);
+    let build = App::build_menu(claude.name(), &initial_state);
 
     let tray = TrayIconBuilder::new()
-        .with_menu(Box::new(initial_menu))
+        .with_menu(Box::new(build.menu))
         .with_tooltip("AIUsageBar")
         .with_icon(icons.get(IconKind::for_state(&initial_state)))
         .build()
         .expect("failed to create tray icon");
 
-    let mut app = App { tray, icons, id_quit, id_refresh, claude };
+    let mut app = App {
+        tray,
+        icons,
+        id_quit: build.quit,
+        id_refresh: build.refresh,
+        claude,
+    };
     event_loop.run_app(&mut app).expect("event loop error");
 }
 
