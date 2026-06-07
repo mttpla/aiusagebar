@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 const LABEL: &str = "com.mttpla.aiusagebar";
 
 fn plist_path() -> Option<std::path::PathBuf> {
@@ -56,15 +54,23 @@ pub fn enable() -> Result<(), String> {
     Ok(())
 }
 
+// launchctl exit codes we treat as benign.
+const LAUNCHCTL_ALREADY_LOADED: i32 = 36;
+const LAUNCHCTL_NOT_LOADED: i32 = 3;
+
 #[cfg(not(debug_assertions))]
 pub fn enable() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let binary = exe.to_str().ok_or("non-UTF8 binary path")?;
     let plist = plist_path().ok_or("no home directory")?;
-    if let Some(parent) = plist.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let content = plist_content(binary);
+    let needs_write = std::fs::read_to_string(&plist).map(|cur| cur != content).unwrap_or(true);
+    if needs_write {
+        if let Some(parent) = plist.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&plist, &content).map_err(|e| e.to_string())?;
     }
-    std::fs::write(&plist, plist_content(binary)).map_err(|e| e.to_string())?;
     let uid = uid()?;
     let plist_str = plist.to_str().ok_or("non-UTF8 plist path")?;
     let out = std::process::Command::new("launchctl")
@@ -74,13 +80,14 @@ pub fn enable() -> Result<(), String> {
     // Plist written = launch-at-login registered. Bootstrap is best-effort (immediate start).
     // macOS 13+ auto-manages LaunchAgents from ~/Library/LaunchAgents/ without needing bootstrap.
     let code = out.status.code().unwrap_or(-1);
-    if !out.status.success() && code != 36 {
+    if !out.status.success() && code != LAUNCHCTL_ALREADY_LOADED {
         let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
         eprintln!("[launch_at_login] bootstrap warning (plist registered, will start at next login): {msg}");
     }
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn disable() -> Result<(), String> {
     let uid = uid()?;
     let out = std::process::Command::new("launchctl")
@@ -88,7 +95,7 @@ pub fn disable() -> Result<(), String> {
         .output()
         .map_err(|e| e.to_string())?;
     let code = out.status.code().unwrap_or(-1);
-    let result = if out.status.success() || code == 36 || code == 3 {
+    let result = if out.status.success() || code == LAUNCHCTL_ALREADY_LOADED || code == LAUNCHCTL_NOT_LOADED {
         Ok(())
     } else {
         let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
@@ -100,6 +107,7 @@ pub fn disable() -> Result<(), String> {
     result
 }
 
+#[allow(dead_code)]
 pub fn is_enabled() -> bool {
     plist_path().map(|p| p.exists()).unwrap_or(false)
 }
