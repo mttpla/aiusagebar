@@ -42,6 +42,7 @@ name = "aiusagebar"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "core-foundation 0.9.4",
  "dirs 5.0.1",
  "image",
  "objc2 0.5.2",

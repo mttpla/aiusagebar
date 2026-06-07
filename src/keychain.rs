@@ -68,14 +68,4 @@ mod tests {
         assert!(result.is_empty());
     }
 
-    #[test]
-    #[ignore]
-    fn copilot_keychain_smoke() {
-        let entries = super::enumerate_generic_passwords("copilot-cli");
-        assert!(!entries.is_empty(), "expected copilot-cli entries in Keychain");
-        for (account, token) in &entries {
-            assert!(account.starts_with("https://github.com:"), "bad account: {account}");
-            assert!(!token.is_empty());
-        }
-    }
 }
