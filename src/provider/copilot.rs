@@ -103,6 +103,55 @@ pub fn do_copilot_fetch(
     UsageState::Error(error_msgs.join("; "))
 }
 
+fn load_copilot_tokens() -> Vec<String> {
+    let mut tokens: Vec<String> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut add = |t: String| {
+        if seen.insert(t.clone()) {
+            tokens.push(t);
+        }
+    };
+
+    for var in &["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"] {
+        if let Ok(t) = std::env::var(var) {
+            add(t);
+        }
+    }
+
+    for (_account, password) in crate::keychain::enumerate_generic_passwords("copilot-cli") {
+        add(password);
+    }
+
+    tokens
+}
+
+pub struct CopilotProvider;
+
+impl CopilotProvider {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl crate::provider::UsageProvider for CopilotProvider {
+    fn name(&self) -> &'static str {
+        "GitHub"
+    }
+
+    fn fetch(&self) -> UsageState {
+        do_copilot_fetch(
+            load_copilot_tokens(),
+            &|token| {
+                crate::http::get(
+                    "https://api.github.com/copilot_internal/user",
+                    token,
+                    &[],
+                )
+            },
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
