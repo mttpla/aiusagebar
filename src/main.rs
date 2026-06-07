@@ -1,8 +1,10 @@
 mod http;
+mod icon;
 mod keychain;
 mod launch_at_login;
 mod provider;
 
+use icon::{IconKind, Icons};
 use provider::claude::ClaudeProvider;
 use provider::{UsageProvider, UsageState};
 use tray_icon::{
@@ -14,28 +16,9 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::WindowId;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum IconKind {
-    Normal,
-    Alert,
-    Unavailable,
-}
-
-fn icon_for_state(state: &UsageState) -> IconKind {
-    match state {
-        UsageState::Ok(windows) => {
-            if windows.iter().any(|w| w.percent_used.unwrap_or(0.0) >= 80.0) {
-                IconKind::Alert
-            } else {
-                IconKind::Normal
-            }
-        }
-        _ => IconKind::Unavailable,
-    }
-}
-
 struct App {
     tray: tray_icon::TrayIcon,
+    icons: Icons,
     id_quit: tray_icon::menu::MenuId,
     id_refresh: tray_icon::menu::MenuId,
     claude: ClaudeProvider,
@@ -88,12 +71,8 @@ impl App {
         self.id_refresh = id_refresh;
         self.id_quit = id_quit;
         self.tray.set_menu(Some(Box::new(menu)));
-        let icon_bytes = match icon_for_state(&state) {
-            IconKind::Normal => ICON_NORMAL,
-            IconKind::Alert => ICON_ALERT,
-            IconKind::Unavailable => ICON_UNAVAILABLE,
-        };
-        self.tray.set_icon(Some(parse_icon(icon_bytes))).ok();
+        let kind = IconKind::for_state(&state);
+        self.tray.set_icon(Some(self.icons.get(kind))).ok();
     }
 }
 
@@ -129,18 +108,19 @@ fn main() {
     }
 
     let event_loop = EventLoop::new().expect("failed to create event loop");
-    let icon = parse_icon(ICON_UNAVAILABLE);
+    let icons = Icons::load();
     let claude = ClaudeProvider::new();
-    let (initial_menu, id_refresh, id_quit) = App::build_menu(claude.name(), &UsageState::NotConfigured);
+    let initial_state = UsageState::NotConfigured;
+    let (initial_menu, id_refresh, id_quit) = App::build_menu(claude.name(), &initial_state);
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(initial_menu))
         .with_tooltip("AIUsageBar")
-        .with_icon(icon)
+        .with_icon(icons.get(IconKind::for_state(&initial_state)))
         .build()
         .expect("failed to create tray icon");
 
-    let mut app = App { tray, id_quit, id_refresh, claude };
+    let mut app = App { tray, icons, id_quit, id_refresh, claude };
     event_loop.run_app(&mut app).expect("event loop error");
 }
 
@@ -151,74 +131,5 @@ fn set_accessory_policy() {
         let cls = AnyClass::get("NSApplication").unwrap();
         let app: *mut objc2::runtime::AnyObject = objc2::msg_send![cls, sharedApplication];
         let _: bool = objc2::msg_send![app, setActivationPolicy: 1_i64];
-    }
-}
-
-static ICON_NORMAL: &[u8] = include_bytes!("../icons/brain_normal.png");
-static ICON_ALERT: &[u8] = include_bytes!("../icons/brain_alert.png");
-static ICON_UNAVAILABLE: &[u8] = include_bytes!("../icons/brain_unavailable.png");
-
-fn parse_icon(bytes: &[u8]) -> tray_icon::Icon {
-    let img = image::load_from_memory(bytes)
-        .expect("failed to decode icon")
-        .into_rgba8();
-    let (w, h) = img.dimensions();
-    tray_icon::Icon::from_rgba(img.into_raw(), w, h).expect("failed to create icon")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use provider::{LimitWindow, UsageState};
-
-    fn window(pct: Option<f32>) -> LimitWindow {
-        LimitWindow {
-            name: "test".into(),
-            percent_used: pct,
-            limit: None,
-            remaining: None,
-            resets_at: None,
-            unlimited: false,
-        }
-    }
-
-    #[test]
-    fn icon_normal_when_all_under_threshold() {
-        let state = UsageState::Ok(vec![window(Some(50.0)), window(Some(79.9))]);
-        assert_eq!(icon_for_state(&state), IconKind::Normal);
-    }
-
-    #[test]
-    fn icon_alert_when_any_at_threshold() {
-        let state = UsageState::Ok(vec![window(Some(50.0)), window(Some(80.0))]);
-        assert_eq!(icon_for_state(&state), IconKind::Alert);
-    }
-
-    #[test]
-    fn icon_alert_when_any_over_threshold() {
-        let state = UsageState::Ok(vec![window(Some(95.0))]);
-        assert_eq!(icon_for_state(&state), IconKind::Alert);
-    }
-
-    #[test]
-    fn icon_unavailable_on_error() {
-        assert_eq!(icon_for_state(&UsageState::Error("e".into())), IconKind::Unavailable);
-    }
-
-    #[test]
-    fn icon_unavailable_on_stale() {
-        assert_eq!(icon_for_state(&UsageState::Stale("s".into())), IconKind::Unavailable);
-    }
-
-    #[test]
-    fn icon_unavailable_on_not_configured() {
-        assert_eq!(icon_for_state(&UsageState::NotConfigured), IconKind::Unavailable);
-    }
-
-    #[test]
-    fn icon_normal_when_percent_unknown() {
-        // None percent_used (unlimited window) → treated as 0.0 → Normal
-        let state = UsageState::Ok(vec![window(None)]);
-        assert_eq!(icon_for_state(&state), IconKind::Normal);
     }
 }
