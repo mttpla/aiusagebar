@@ -384,6 +384,6 @@ mod tests {
         let cache = empty_cache();
         let state = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache);
         assert!(matches!(state, UsageState::Ok(ref w) if w.len() == 2));
-        assert!(cache.lock().unwrap().is_some(), "cache must be populated after success");
+        assert_eq!(cache.lock().unwrap().as_ref().map(|v| v.len()), Some(2), "cache must be populated with 2 windows after success");
     }
 }
