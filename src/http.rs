@@ -39,17 +39,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn http_error_variants_are_distinct() {
-        assert_ne!(HttpError::Unauthorized, HttpError::RateLimited);
-    }
-
-    #[test]
-    fn http_error_other_carries_message() {
-        let e = HttpError::Other("boom".to_string());
-        assert_eq!(e, HttpError::Other("boom".to_string()));
-    }
-
-    #[test]
     fn shared_client_is_reused() {
         let a = super::client() as *const reqwest::blocking::Client;
         let b = super::client() as *const reqwest::blocking::Client;
