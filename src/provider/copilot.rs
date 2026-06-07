@@ -1,0 +1,229 @@
+use crate::http::HttpError;
+use crate::provider::{LimitWindow, UsageState};
+
+fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
+    let v: serde_json::Value = serde_json::from_str(body).map_err(|e| e.to_string())?;
+
+    let Some(snapshots) = v.get("quota_snapshots").and_then(|s| s.as_object()) else {
+        return Ok(vec![]);
+    };
+
+    let login = v.get("login").and_then(|l| l.as_str()).unwrap_or("unknown");
+    let resets_at = v
+        .get("quota_reset_date_utc")
+        .and_then(|r| r.as_str())
+        .map(|s| s.to_string());
+
+    let mut windows = Vec::new();
+
+    for (key, snap) in snapshots {
+        if snap.get("unlimited").and_then(|u| u.as_bool()).unwrap_or(false) {
+            continue;
+        }
+        let Some(percent_remaining) = snap.get("percent_remaining").and_then(|p| p.as_f64()) else {
+            continue;
+        };
+        let percent_used = 100.0 - percent_remaining as f32;
+        let limit = snap
+            .get("entitlement")
+            .and_then(|e| e.as_u64())
+            .map(|e| e as u32);
+        let remaining = snap
+            .get("remaining")
+            .and_then(|r| r.as_u64())
+            .map(|r| r as u32);
+
+        windows.push(LimitWindow {
+            name: format!("{} / {}", login, key),
+            percent_used: Some(percent_used),
+            limit,
+            remaining,
+            resets_at: resets_at.clone(),
+            unlimited: false,
+        });
+    }
+
+    Ok(windows)
+}
+
+pub fn do_copilot_fetch(
+    tokens: Vec<String>,
+    http: &dyn Fn(&str) -> Result<String, HttpError>,
+) -> UsageState {
+    if tokens.is_empty() {
+        return UsageState::NotConfigured;
+    }
+
+    let mut ok_windows: Vec<LimitWindow> = Vec::new();
+    let mut stale_count: usize = 0;
+    let mut error_msgs: Vec<String> = Vec::new();
+
+    for token in &tokens {
+        match http(token) {
+            Ok(body) => match parse_copilot_response(&body) {
+                Ok(windows) => ok_windows.extend(windows),
+                Err(e) => error_msgs.push(e),
+            },
+            Err(HttpError::Unauthorized) => stale_count += 1,
+            Err(HttpError::RateLimited) => error_msgs.push("rate limited".to_string()),
+            Err(HttpError::Other(e)) => error_msgs.push(e),
+        }
+    }
+
+    if !ok_windows.is_empty() {
+        for _ in 0..stale_count {
+            ok_windows.push(LimitWindow {
+                name: "GitHub — token scaduto, ri-logga".to_string(),
+                percent_used: None,
+                limit: None,
+                remaining: None,
+                resets_at: None,
+                unlimited: false,
+            });
+        }
+        for msg in error_msgs {
+            ok_windows.push(LimitWindow {
+                name: format!("GitHub — {}", msg),
+                percent_used: None,
+                limit: None,
+                remaining: None,
+                resets_at: None,
+                unlimited: false,
+            });
+        }
+        return UsageState::Ok(ok_windows);
+    }
+
+    if stale_count > 0 {
+        return UsageState::Stale(
+            "Token Copilot scaduti — esegui: copilot auth login".to_string(),
+        );
+    }
+
+    UsageState::Error(error_msgs.join("; "))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::http::HttpError;
+    use crate::provider::UsageState;
+
+    // ── parse_copilot_response ────────────────────────────────────────────
+
+    #[test]
+    fn parse_single_limited_snapshot() {
+        let body = r#"{
+            "login": "mttpla",
+            "quota_reset_date_utc": "2026-07-01T00:00:00Z",
+            "quota_snapshots": {
+                "premium_interactions": {
+                    "entitlement": 7000,
+                    "remaining": 6604,
+                    "percent_remaining": 94.3,
+                    "unlimited": false
+                }
+            }
+        }"#;
+        let windows = parse_copilot_response(body).unwrap();
+        assert_eq!(windows.len(), 1);
+        assert_eq!(windows[0].name, "mttpla / premium_interactions");
+        assert!((windows[0].percent_used.unwrap() - 5.7).abs() < 0.1);
+        assert_eq!(windows[0].remaining, Some(6604));
+        assert_eq!(windows[0].limit, Some(7000));
+        assert_eq!(windows[0].resets_at.as_deref(), Some("2026-07-01T00:00:00Z"));
+        assert!(!windows[0].unlimited);
+    }
+
+    #[test]
+    fn parse_skips_unlimited_snapshots() {
+        let body = r#"{
+            "login": "mttpla",
+            "quota_reset_date_utc": "2026-07-01T00:00:00Z",
+            "quota_snapshots": {
+                "chat":        { "unlimited": true },
+                "completions": { "unlimited": true }
+            }
+        }"#;
+        let windows = parse_copilot_response(body).unwrap();
+        assert_eq!(windows.len(), 0);
+    }
+
+    #[test]
+    fn parse_mixed_limited_and_unlimited() {
+        let body = r#"{
+            "login": "mttpla",
+            "quota_reset_date_utc": "2026-07-01T00:00:00Z",
+            "quota_snapshots": {
+                "premium_interactions": { "entitlement": 7000, "remaining": 500, "percent_remaining": 50.0, "unlimited": false },
+                "chat": { "unlimited": true }
+            }
+        }"#;
+        let windows = parse_copilot_response(body).unwrap();
+        assert_eq!(windows.len(), 1);
+        assert!((windows[0].percent_used.unwrap() - 50.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn parse_missing_quota_snapshots_returns_empty() {
+        // Account without Copilot access — no quota_snapshots field
+        let body = r#"{"login": "mttpla", "copilot_plan": "individual", "access_type_sku": "no_access"}"#;
+        let windows = parse_copilot_response(body).unwrap();
+        assert_eq!(windows.len(), 0);
+    }
+
+    #[test]
+    fn parse_missing_percent_remaining_skips_snapshot() {
+        let body = r#"{
+            "login": "mttpla",
+            "quota_reset_date_utc": "2026-07-01T00:00:00Z",
+            "quota_snapshots": { "mystery": { "unlimited": false } }
+        }"#;
+        let windows = parse_copilot_response(body).unwrap();
+        assert_eq!(windows.len(), 0);
+    }
+
+    // ── do_copilot_fetch ──────────────────────────────────────────────────
+
+    fn valid_body() -> String {
+        r#"{"login":"mttpla","quota_reset_date_utc":"2026-07-01T00:00:00Z","quota_snapshots":{"premium_interactions":{"entitlement":7000,"remaining":6604,"percent_remaining":94.3,"unlimited":false}}}"#.to_string()
+    }
+
+    #[test]
+    fn fetch_empty_tokens_returns_not_configured() {
+        let state = do_copilot_fetch(vec![], &|_| unreachable!());
+        assert_eq!(state, UsageState::NotConfigured);
+    }
+
+    #[test]
+    fn fetch_all_401_returns_stale() {
+        let state = do_copilot_fetch(
+            vec!["tok".to_string()],
+            &|_| Err(HttpError::Unauthorized),
+        );
+        assert!(matches!(state, UsageState::Stale(_)));
+    }
+
+    #[test]
+    fn fetch_200_valid_returns_ok_with_windows() {
+        let state = do_copilot_fetch(
+            vec!["tok".to_string()],
+            &|_| Ok(valid_body()),
+        );
+        assert!(matches!(state, UsageState::Ok(ref w) if !w.is_empty()));
+    }
+
+    #[test]
+    fn fetch_mixed_success_and_401_returns_ok_with_sentinel() {
+        let tokens = vec!["good".to_string(), "bad".to_string()];
+        let state = do_copilot_fetch(tokens, &|tok| {
+            if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Unauthorized) }
+        });
+        let UsageState::Ok(windows) = state else { panic!("expected Ok") };
+        assert!(windows.iter().any(|w| w.percent_used.is_some()), "real window missing");
+        assert!(
+            windows.iter().any(|w| w.percent_used.is_none() && w.name.contains("scaduto")),
+            "sentinel window missing"
+        );
+    }
+}

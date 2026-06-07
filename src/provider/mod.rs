@@ -1,4 +1,5 @@
 pub mod claude;
+pub mod copilot;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LimitWindow {
