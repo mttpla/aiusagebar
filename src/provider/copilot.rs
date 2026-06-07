@@ -73,7 +73,7 @@ pub fn do_copilot_fetch(
     if !ok_windows.is_empty() {
         for _ in 0..stale_count {
             ok_windows.push(LimitWindow {
-                name: "GitHub — token scaduto, ri-logga".to_string(),
+                name: "GitHub — token expired, re-login".to_string(),
                 percent_used: None,
                 limit: None,
                 remaining: None,
@@ -96,7 +96,7 @@ pub fn do_copilot_fetch(
 
     if stale_count > 0 {
         return UsageState::Stale(
-            "Token Copilot scaduti — esegui: copilot auth login".to_string(),
+            "Copilot tokens expired — run: copilot auth login".to_string(),
         );
     }
 
@@ -222,7 +222,7 @@ mod tests {
         let UsageState::Ok(windows) = state else { panic!("expected Ok") };
         assert!(windows.iter().any(|w| w.percent_used.is_some()), "real window missing");
         assert!(
-            windows.iter().any(|w| w.percent_used.is_none() && w.name.contains("scaduto")),
+            windows.iter().any(|w| w.percent_used.is_none() && w.name.contains("expired")),
             "sentinel window missing"
         );
     }
