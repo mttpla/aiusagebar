@@ -88,6 +88,12 @@ impl App {
         self.id_refresh = id_refresh;
         self.id_quit = id_quit;
         self.tray.set_menu(Some(Box::new(menu)));
+        let icon_bytes = match icon_for_state(&state) {
+            IconKind::Normal => ICON_NORMAL,
+            IconKind::Alert => ICON_ALERT,
+            IconKind::Unavailable => ICON_UNAVAILABLE,
+        };
+        self.tray.set_icon(Some(parse_icon(icon_bytes))).ok();
     }
 }
 
@@ -123,7 +129,7 @@ fn main() {
     }
 
     let event_loop = EventLoop::new().expect("failed to create event loop");
-    let icon = load_icon();
+    let icon = parse_icon(ICON_UNAVAILABLE);
     let claude = ClaudeProvider::new();
     let (initial_menu, id_refresh, id_quit) = App::build_menu(claude.name(), &UsageState::NotConfigured);
 
@@ -148,24 +154,16 @@ fn set_accessory_policy() {
     }
 }
 
-fn load_icon() -> tray_icon::Icon {
-    let icon_path = std::path::Path::new("icons/app_icon.png");
-    let (rgba, width, height) = if icon_path.exists() {
-        let img = image::open(icon_path)
-            .expect("failed to open icons/app_icon.png")
-            .into_rgba8();
-        let (w, h) = img.dimensions();
-        (img.into_raw(), w, h)
-    } else {
-        eprintln!("icons/app_icon.png not found, using placeholder icon.");
-        let size = 32u32;
-        let mut pixels = Vec::with_capacity((size * size * 4) as usize);
-        for _ in 0..(size * size) {
-            pixels.extend_from_slice(&[0xCC, 0x00, 0x00, 0xFF]);
-        }
-        (pixels, size, size)
-    };
-    tray_icon::Icon::from_rgba(rgba, width, height).expect("failed to create icon")
+static ICON_NORMAL: &[u8] = include_bytes!("../icons/brain_normal.png");
+static ICON_ALERT: &[u8] = include_bytes!("../icons/brain_alert.png");
+static ICON_UNAVAILABLE: &[u8] = include_bytes!("../icons/brain_unavailable.png");
+
+fn parse_icon(bytes: &[u8]) -> tray_icon::Icon {
+    let img = image::load_from_memory(bytes)
+        .expect("failed to decode icon")
+        .into_rgba8();
+    let (w, h) = img.dimensions();
+    tray_icon::Icon::from_rgba(img.into_raw(), w, h).expect("failed to create icon")
 }
 
 #[cfg(test)]
