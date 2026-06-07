@@ -17,16 +17,8 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<Str
         .send()
         .map_err(|e| HttpError::Other(e.to_string()))?;
     match resp.status().as_u16() {
-        200 => {
-            let body = resp.text().map_err(|e| HttpError::Other(e.to_string()))?;
-            eprintln!("[debug] 200 body: {}", body);
-            Ok(body)
-        }
-        401 => {
-            let body = resp.text().unwrap_or_default();
-            eprintln!("[debug] 401 body: {}", body);
-            Err(HttpError::Unauthorized)
-        }
+        200 => resp.text().map_err(|e| HttpError::Other(e.to_string())),
+        401 => Err(HttpError::Unauthorized),
         429 => Err(HttpError::RateLimited),
         code => Err(HttpError::Other(format!("HTTP {}", code))),
     }

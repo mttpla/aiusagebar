@@ -131,9 +131,6 @@ impl UsageProvider for ClaudeProvider {
             return UsageState::Stale(format!("Expired on {} — run: claude login", date));
         }
         let ua = get_user_agent();
-        eprintln!("[debug] token: {}...", &creds.access_token[..20.min(creds.access_token.len())]);
-        eprintln!("[debug] expires_at_ms: {}", creds.expires_at_ms);
-        eprintln!("[debug] user-agent: {}", ua);
         match crate::http::get(USAGE_URL, &creds.access_token, &[("User-Agent", ua)]) {
             Ok(body) => match parse_response(&body) {
                 Ok(windows) => {
