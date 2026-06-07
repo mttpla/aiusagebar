@@ -71,15 +71,14 @@ pub fn enable() -> Result<(), String> {
         .args(["bootstrap", &format!("gui/{uid}"), plist_str])
         .output()
         .map_err(|e| e.to_string())?;
-    // 36 = EALREADY (already bootstrapped) — treat as success
+    // Plist written = launch-at-login registered. Bootstrap is best-effort (immediate start).
+    // macOS 13+ auto-manages LaunchAgents from ~/Library/LaunchAgents/ without needing bootstrap.
     let code = out.status.code().unwrap_or(-1);
-    if out.status.success() || code == 36 {
-        Ok(())
-    } else {
+    if !out.status.success() && code != 36 {
         let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        let _ = std::fs::remove_file(&plist);
-        Err(if msg.is_empty() { format!("launchctl exited with code {code}") } else { msg })
+        eprintln!("[launch_at_login] bootstrap warning (plist registered, will start at next login): {msg}");
     }
+    Ok(())
 }
 
 pub fn disable() -> Result<(), String> {
