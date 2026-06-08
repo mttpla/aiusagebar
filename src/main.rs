@@ -15,6 +15,8 @@ use tray_icon::{
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+#[cfg(target_os = "macos")]
+use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 use winit::window::WindowId;
 
 struct MenuBuild {
@@ -119,9 +121,6 @@ impl ApplicationHandler for App {
 }
 
 fn main() {
-    #[cfg(target_os = "macos")]
-    set_accessory_policy();
-
     if let Err(e) = launch_at_login::enable() {
         eprintln!("[launch_at_login] {e}");
     }
@@ -131,6 +130,12 @@ fn main() {
         Box::new(CopilotProvider::new()),
     ];
 
+    #[cfg(target_os = "macos")]
+    let event_loop = EventLoop::builder()
+        .with_activation_policy(ActivationPolicy::Accessory)
+        .build()
+        .expect("failed to create event loop");
+    #[cfg(not(target_os = "macos"))]
     let event_loop = EventLoop::new().expect("failed to create event loop");
     let icons = Icons::load();
 
@@ -156,14 +161,4 @@ fn main() {
         providers,
     };
     event_loop.run_app(&mut app).expect("event loop error");
-}
-
-#[cfg(target_os = "macos")]
-fn set_accessory_policy() {
-    use objc2::runtime::AnyClass;
-    unsafe {
-        let cls = AnyClass::get("NSApplication").unwrap();
-        let app: *mut objc2::runtime::AnyObject = objc2::msg_send![cls, sharedApplication];
-        let _: bool = objc2::msg_send![app, setActivationPolicy: 1_i64];
-    }
 }
