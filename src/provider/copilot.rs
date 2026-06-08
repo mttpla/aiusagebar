@@ -104,24 +104,13 @@ pub fn do_copilot_fetch(
 }
 
 fn load_copilot_tokens() -> Vec<String> {
-    let mut tokens: Vec<String> = Vec::new();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut add = |t: String| {
-        if seen.insert(t.clone()) {
-            tokens.push(t);
-        }
-    };
-
-    for var in &["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"] {
-        if let Ok(t) = std::env::var(var) {
-            add(t);
-        }
-    }
-
+    let mut tokens: Vec<String> = Vec::new();
     for (_account, password) in crate::keychain::enumerate_generic_passwords("copilot-cli") {
-        add(password);
+        if seen.insert(password.clone()) {
+            tokens.push(password);
+        }
     }
-
     tokens
 }
 
@@ -145,7 +134,7 @@ impl crate::provider::UsageProvider for CopilotProvider {
                 crate::http::get(
                     "https://api.github.com/copilot_internal/user",
                     token,
-                    &[],
+                    &[("User-Agent", "aiusagebar/0.1")],
                 )
             },
         )
