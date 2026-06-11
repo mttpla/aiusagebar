@@ -54,12 +54,10 @@ pub fn show() {
 
     // Force alert width so the GitHub URL fits on one line without wrapping.
     let spacer = NSView::new(mtm);
-    unsafe {
-        spacer.setFrame(NSRect {
-            origin: NSPoint { x: 0.0, y: 0.0 },
-            size: NSSize { width: 460.0, height: 1.0 },
-        });
-    }
+    spacer.setFrame(NSRect {
+        origin: NSPoint { x: 0.0, y: 0.0 },
+        size: NSSize { width: 460.0, height: 1.0 },
+    });
     alert.setAccessoryView(Some(&spacer));
 
     alert.addButtonWithTitle(&NSString::from_str("OK"));
