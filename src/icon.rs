@@ -10,7 +10,7 @@ pub enum IconKind {
 impl IconKind {
     pub fn for_state(state: &UsageState, threshold: f32) -> Self {
         match state {
-            UsageState::Ok(windows) => {
+            UsageState::Ok(windows, _) => {
                 if windows.iter().any(|w| w.percent_used.unwrap_or(0.0) >= threshold) {
                     IconKind::Alert
                 } else {
@@ -86,13 +86,13 @@ mod tests {
 
     #[test]
     fn normal_under_threshold() {
-        let s = UsageState::Ok(vec![window(Some(79.9))]);
+        let s = UsageState::Ok(vec![window(Some(79.9))], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Normal);
     }
 
     #[test]
     fn alert_at_threshold() {
-        let s = UsageState::Ok(vec![window(Some(80.0))]);
+        let s = UsageState::Ok(vec![window(Some(80.0))], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Alert);
     }
 
@@ -113,53 +113,53 @@ mod tests {
 
     #[test]
     fn normal_when_percent_unknown() {
-        let s = UsageState::Ok(vec![window(None)]);
+        let s = UsageState::Ok(vec![window(None)], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Normal);
     }
 
     #[test]
     fn alert_when_any_window_above_threshold() {
-        let s = UsageState::Ok(vec![window(Some(50.0)), window(Some(90.0))]);
+        let s = UsageState::Ok(vec![window(Some(50.0)), window(Some(90.0))], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Alert);
     }
 
     #[test]
     fn alert_ignores_none_with_high_other() {
-        let s = UsageState::Ok(vec![window(None), window(Some(85.0))]);
+        let s = UsageState::Ok(vec![window(None), window(Some(85.0))], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Alert);
     }
 
     #[test]
     fn normal_when_all_windows_none() {
-        let s = UsageState::Ok(vec![window(None), window(None)]);
+        let s = UsageState::Ok(vec![window(None), window(None)], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Normal);
     }
 
     #[test]
     fn fold_alert_beats_error() {
-        let high = UsageState::Ok(vec![window(Some(90.0))]);
+        let high = UsageState::Ok(vec![window(Some(90.0))], None);
         let err = UsageState::Error("boom".into());
         assert_eq!(IconKind::for_providers(&[&high, &err], 80.0), IconKind::Alert);
     }
 
     #[test]
     fn fold_alert_beats_unavailable_regardless_of_order() {
-        let high = UsageState::Ok(vec![window(Some(85.0))]);
+        let high = UsageState::Ok(vec![window(Some(85.0))], None);
         let stale = UsageState::Stale("old".into());
         assert_eq!(IconKind::for_providers(&[&stale, &high], 80.0), IconKind::Alert);
     }
 
     #[test]
     fn fold_error_beats_normal() {
-        let ok = UsageState::Ok(vec![window(Some(50.0))]);
+        let ok = UsageState::Ok(vec![window(Some(50.0))], None);
         let err = UsageState::Error("boom".into());
         assert_eq!(IconKind::for_providers(&[&ok, &err], 80.0), IconKind::Unavailable);
     }
 
     #[test]
     fn fold_all_normal() {
-        let a = UsageState::Ok(vec![window(Some(10.0))]);
-        let b = UsageState::Ok(vec![window(Some(30.0))]);
+        let a = UsageState::Ok(vec![window(Some(10.0))], None);
+        let b = UsageState::Ok(vec![window(Some(30.0))], None);
         assert_eq!(IconKind::for_providers(&[&a, &b], 80.0), IconKind::Normal);
     }
 
@@ -178,7 +178,7 @@ mod tests {
             resets_at: None,
             unlimited: true,
         };
-        let s = UsageState::Ok(vec![w]);
+        let s = UsageState::Ok(vec![w], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Alert);
     }
 }

@@ -15,7 +15,7 @@ pub struct LimitWindow {
 pub enum UsageState {
     NotConfigured,
     Stale(String),
-    Ok(Vec<LimitWindow>),
+    Ok(Vec<LimitWindow>, Option<String>),
     Error(String),
 }
 
