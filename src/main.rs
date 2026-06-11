@@ -3,6 +3,7 @@ mod icon;
 mod keychain;
 mod launch_at_login;
 mod settings;
+mod version;
 mod provider;
 
 use std::time::Instant;
