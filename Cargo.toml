@@ -17,7 +17,7 @@ dirs = "5"
 security-framework = "3"
 core-foundation = "0.9"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSAlert"] }
+objc2-app-kit = { version = "0.3", features = ["NSAlert", "NSView"] }
 objc2-foundation = "0.3"
 
 [build-dependencies]

@@ -39,8 +39,8 @@ pub fn body_text(version: &str, copyright_year: &str, italian: bool) -> String {
 pub fn show() {
     use chrono::Local;
     use objc2::MainThreadMarker;
-    use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn};
-    use objc2_foundation::NSString;
+    use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn, NSView};
+    use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 
     let version = crate::version::app_version();
     let year_str = copyright_year_str(Local::now().year());
@@ -48,8 +48,20 @@ pub fn show() {
 
     let mtm = MainThreadMarker::new().expect("show() must be called on the main thread");
     let alert = NSAlert::new(mtm);
+    unsafe { alert.setIcon(None) };
     alert.setMessageText(&NSString::from_str("AIUsageBar"));
     alert.setInformativeText(&NSString::from_str(&body));
+
+    // Force alert width so the GitHub URL fits on one line without wrapping.
+    let spacer = NSView::new(mtm);
+    unsafe {
+        spacer.setFrame(NSRect {
+            origin: NSPoint { x: 0.0, y: 0.0 },
+            size: NSSize { width: 460.0, height: 1.0 },
+        });
+    }
+    alert.setAccessoryView(Some(&spacer));
+
     alert.addButtonWithTitle(&NSString::from_str("OK"));
     alert.addButtonWithTitle(&NSString::from_str("matteopaoli.it"));
     let response = alert.runModal();
