@@ -10,7 +10,7 @@ use provider::claude::ClaudeProvider;
 use provider::copilot::CopilotProvider;
 use provider::{UsageProvider, UsageState};
 use tray_icon::{
-    menu::{Menu, MenuEvent, MenuItem},
+    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     TrayIconBuilder, TrayIconEvent,
 };
 use winit::application::ApplicationHandler;
@@ -40,7 +40,7 @@ struct App {
 }
 
 impl App {
-    fn build_menu(states: &[(&str, &UsageState)]) -> MenuBuild {
+    fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
         let menu = Menu::new();
         for (name, state) in states {
             match state {
@@ -69,6 +69,12 @@ impl App {
                 }
             }
         }
+        if let Some(ts) = last_updated {
+            // TODO: i18n
+            append_label(&menu, format!("Updated: {}", ts));
+            menu.append(&PredefinedMenuItem::separator())
+                .expect("menu append failed");
+        }
         let item_refresh = MenuItem::new("Refresh", true, None);
         let item_quit = MenuItem::new("Quit", true, None);
         menu.append(&item_refresh).expect("menu append failed");
@@ -91,7 +97,7 @@ impl App {
 
         let refs: Vec<(&str, &UsageState)> =
             states.iter().map(|(n, s)| (*n, s)).collect();
-        let build = Self::build_menu(&refs);
+        let build = Self::build_menu(&refs, None);
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
         self.tray.set_menu(Some(Box::new(build.menu)));
@@ -145,7 +151,7 @@ fn main() {
         .iter()
         .map(|p| (p.name(), &initial_state))
         .collect();
-    let build = App::build_menu(&initial_refs);
+    let build = App::build_menu(&initial_refs, None);
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(build.menu))
