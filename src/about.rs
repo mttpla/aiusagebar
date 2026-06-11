@@ -17,15 +17,14 @@ pub fn is_italian() -> bool {
         .starts_with("it")
 }
 
-pub fn body_text(version: &str, copyright_year: &str, italian: bool) -> String {
+pub fn body_text(copyright_year: &str, italian: bool) -> String {
     let tagline = if italian {
         "Monitor in sola lettura. Non invia prompt, non consuma quota, non modifica credenziali."
     } else {
         "A read-only monitor. Never sends prompts, never spends quota, never modifies credentials."
     };
     format!(
-        "AIUsageBar {version}\n\
-         \u{00a9} {copyright_year} Matteo Paoli \u{00b7} MIT License\n\
+        "\u{00a9} {copyright_year} Matteo Paoli \u{00b7} MIT License\n\
          https://github.com/mttpla/aiusagebar\n\
          \n\
          {tagline}\n\
@@ -44,12 +43,12 @@ pub fn show() {
 
     let version = crate::version::app_version();
     let year_str = copyright_year_str(Local::now().year());
-    let body = body_text(&version, &year_str, is_italian());
+    let body = body_text(&year_str, is_italian());
 
     let mtm = MainThreadMarker::new().expect("show() must be called on the main thread");
     let alert = NSAlert::new(mtm);
     unsafe { alert.setIcon(None) };
-    alert.setMessageText(&NSString::from_str("AIUsageBar"));
+    alert.setMessageText(&NSString::from_str(&format!("AIUsageBar {version}")));
 
     // Centered body via NSTextField accessory view (NSAlert has no built-in center alignment).
     let tf = NSTextField::wrappingLabelWithString(&NSString::from_str(&body), mtm);
@@ -86,34 +85,33 @@ mod tests {
 
     #[test]
     fn body_english_contains_english_tagline() {
-        let body = body_text("0.1.0", "2026", false);
+        let body = body_text("2026", false);
         assert!(body.contains("read-only monitor"));
         assert!(!body.contains("sola lettura"));
     }
 
     #[test]
     fn body_italian_contains_italian_tagline() {
-        let body = body_text("0.1.0", "2026", true);
+        let body = body_text("2026", true);
         assert!(body.contains("sola lettura"));
         assert!(!body.contains("read-only monitor"));
     }
 
     #[test]
-    fn body_contains_version_and_year() {
-        let body = body_text("1.2.3", "2026\u{2013}2028", false);
-        assert!(body.contains("1.2.3"));
+    fn body_contains_year() {
+        let body = body_text("2026\u{2013}2028", false);
         assert!(body.contains("2026\u{2013}2028"));
     }
 
     #[test]
     fn body_contains_github_url() {
-        let body = body_text("0.1.0", "2026", false);
+        let body = body_text("2026", false);
         assert!(body.contains("https://github.com/mttpla/aiusagebar"));
     }
 
     #[test]
     fn body_contains_disclaimer() {
-        let body = body_text("0.1.0", "2026", false);
+        let body = body_text("2026", false);
         assert!(body.contains("as is"));
         assert!(body.contains("not liable"));
     }
