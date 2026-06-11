@@ -99,7 +99,7 @@ impl App {
             .collect();
 
         let state_refs: Vec<&UsageState> = states.iter().map(|(_, s)| s).collect();
-        let icon_kind = IconKind::for_providers(&state_refs);
+        let icon_kind = IconKind::for_providers(&state_refs, self.settings.alert_threshold_pct);
 
         let refs: Vec<(&str, &UsageState)> =
             states.iter().map(|(n, s)| (*n, s)).collect();
@@ -122,15 +122,17 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
+        let mut did_refresh = false;
         if now >= self.next_poll_at {
             self.refresh();
             self.next_poll_at = now + self.settings.poll_interval;
+            did_refresh = true;
         }
 
         if let Ok(ev) = MenuEvent::receiver().try_recv() {
             if ev.id == self.id_quit {
                 event_loop.exit();
-            } else if ev.id == self.id_refresh {
+            } else if ev.id == self.id_refresh && !did_refresh {
                 self.refresh();
                 self.next_poll_at = Instant::now() + self.settings.poll_interval;
             }
