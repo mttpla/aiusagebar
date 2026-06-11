@@ -1,11 +1,13 @@
 ---
 id: 2
-status: backlog
+status: done
 priority: Normal
 tags: [versioning, release, build]
 spec: superpowers/specs/2026-06-10-versioning-design.md
+plan: superpowers/plans/2026-06-11-versioning-vergen-git-cliff.md
 created: 2026-06-10
-updated: 2026-06-10
+updated: 2026-06-11
+completed: 2026-06-11
 ---
 # Versioning: vergen + git-cliff + release script
 
@@ -21,3 +23,6 @@ version bump, git tag, and CHANGELOG.md generation via git-cliff.
   Cargo.toml only touched at release time — never dirty during dev.
   Push remains explicit manual step after script runs.
   Spec: docs/superpowers/specs/2026-06-10-versioning-design.md
+- 2026-06-11: Moved backlog → todo.
+- 2026-06-11: Plan written, moved todo → doing. Plan: docs/superpowers/plans/2026-06-11-versioning-vergen-git-cliff.md. 5 tasks: vergen-git2 build dep, version.rs (TDD), cliff.toml, release.sh, kanban close.
+- 2026-06-11: All 5 tasks complete. Implemented: vergen-git2 build dep, VERGEN_GIT_DESCRIBE emitted at compile time, src/version.rs with format_version() (3 tests passing), cliff.toml, scripts/release.sh (executable, syntax checked). Moved doing → done.
