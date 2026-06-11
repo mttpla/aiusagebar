@@ -7,6 +7,8 @@ if [[ "$BUMP" != "major" && "$BUMP" != "minor" && "$BUMP" != "patch" ]]; then
     exit 1
 fi
 
+command -v git-cliff > /dev/null || { echo "Error: git-cliff not found. Install: brew install git-cliff" >&2; exit 1; }
+
 # Must run from repo root
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 if [[ "$(pwd)" != "$REPO_ROOT" ]]; then
