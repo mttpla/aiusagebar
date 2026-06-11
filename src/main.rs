@@ -27,6 +27,7 @@ use winit::window::WindowId;
 
 struct MenuBuild {
     menu: Menu,
+    about: tray_icon::menu::MenuId,
     refresh: tray_icon::menu::MenuId,
     quit: tray_icon::menu::MenuId,
 }
@@ -39,6 +40,7 @@ fn append_label(menu: &Menu, text: impl Into<String>) {
 struct App {
     tray: tray_icon::TrayIcon,
     icons: Icons,
+    id_about: tray_icon::menu::MenuId,
     id_quit: tray_icon::menu::MenuId,
     id_refresh: tray_icon::menu::MenuId,
     providers: Vec<Box<dyn UsageProvider>>,
@@ -50,6 +52,12 @@ struct App {
 impl App {
     fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
         let menu = Menu::new();
+
+        let item_about = MenuItem::new("About AIUsageBar", true, None);
+        menu.append(&item_about).expect("menu append failed");
+        menu.append(&PredefinedMenuItem::separator())
+            .expect("menu append failed");
+
         for (name, state) in states {
             match state {
                 UsageState::NotConfigured => {
@@ -88,6 +96,7 @@ impl App {
         menu.append(&item_refresh).expect("menu append failed");
         menu.append(&item_quit).expect("menu append failed");
         MenuBuild {
+            about: item_about.id().clone(),
             refresh: item_refresh.id().clone(),
             quit: item_quit.id().clone(),
             menu,
@@ -108,6 +117,7 @@ impl App {
         let now = Local::now();
         let updated = now.format("%H:%M").to_string();
         let build = Self::build_menu(&refs, Some(&updated));
+        self.id_about = build.about;
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
         self.tray.set_menu(Some(Box::new(build.menu)));
@@ -135,6 +145,8 @@ impl ApplicationHandler for App {
         if let Ok(ev) = MenuEvent::receiver().try_recv() {
             if ev.id == self.id_quit {
                 event_loop.exit();
+            } else if ev.id == self.id_about {
+                about::show();
             } else if ev.id == self.id_refresh && !did_refresh {
                 self.refresh();
                 self.next_poll_at = Instant::now() + self.settings.poll_interval;
@@ -185,6 +197,7 @@ fn main() {
     let mut app = App {
         tray,
         icons,
+        id_about: build.about,
         id_quit: build.quit,
         id_refresh: build.refresh,
         providers,
