@@ -1,4 +1,5 @@
 use crate::provider::UsageState;
+use crate::settings::DEFAULT_ALERT_THRESHOLD_PCT;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum IconKind {
@@ -7,13 +8,11 @@ pub enum IconKind {
     Unavailable,
 }
 
-const ALERT_THRESHOLD: f32 = 80.0;
-
 impl IconKind {
     pub fn for_state(state: &UsageState) -> Self {
         match state {
             UsageState::Ok(windows) => {
-                if windows.iter().any(|w| w.percent_used.unwrap_or(0.0) >= ALERT_THRESHOLD) {
+                if windows.iter().any(|w| w.percent_used.unwrap_or(0.0) >= DEFAULT_ALERT_THRESHOLD_PCT) {
                     IconKind::Alert
                 } else {
                     IconKind::Normal
