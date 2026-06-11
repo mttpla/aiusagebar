@@ -1,10 +1,12 @@
 use chrono::Datelike;
 
+const START_YEAR: i32 = 2026;
+
 pub fn copyright_year_str(current_year: i32) -> String {
-    if current_year == 2026 {
-        "2026".to_string()
+    if current_year == START_YEAR {
+        START_YEAR.to_string()
     } else {
-        format!("2026\u{2013}{}", current_year)
+        format!("{START_YEAR}\u{2013}{current_year}")
     }
 }
 
