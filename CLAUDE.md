@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workflow Rules
+
+After every brainstorming session that produces a spec, create a kanban card in `docs/kanban/` before invoking `writing-plans`. The card narrative must capture all key decisions and rejected options.
+
 ## Commands
 
 ### One-time dev setup (per machine)
