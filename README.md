@@ -87,3 +87,32 @@ cargo build --release    # release binary
 cargo check              # fast type-check
 cargo clippy             # lint
 ```
+
+### Releasing a new version
+
+**Prerequisite:** `git-cliff` must be on PATH.
+
+```bash
+brew install git-cliff   # once
+```
+
+Then from the repo root:
+
+```bash
+./scripts/release.sh patch   # 0.1.0 → 0.1.1
+./scripts/release.sh minor   # 0.1.0 → 0.2.0
+./scripts/release.sh major   # 0.1.0 → 1.0.0
+```
+
+The script:
+1. Prompts for confirmation
+2. Bumps the version in `Cargo.toml`
+3. Regenerates `CHANGELOG.md` via `git-cliff`
+4. Commits both files (`chore(release): vX.Y.Z`)
+5. Creates the git tag `vX.Y.Z`
+
+Push manually after reviewing:
+
+```bash
+git push && git push --tags
+```
