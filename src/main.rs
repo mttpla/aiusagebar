@@ -103,13 +103,14 @@ impl App {
 
         let refs: Vec<(&str, &UsageState)> =
             states.iter().map(|(n, s)| (*n, s)).collect();
-        let updated = self.last_refreshed_at.as_ref().map(|t| t.format("%H:%M").to_string());
-        let build = Self::build_menu(&refs, updated.as_deref());
+        let now = Local::now();
+        let updated = now.format("%H:%M").to_string();
+        let build = Self::build_menu(&refs, Some(&updated));
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
         self.tray.set_menu(Some(Box::new(build.menu)));
         self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
-        self.last_refreshed_at = Some(Local::now());
+        self.last_refreshed_at = Some(now);
     }
 }
 
