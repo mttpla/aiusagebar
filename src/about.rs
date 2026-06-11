@@ -39,7 +39,7 @@ pub fn body_text(version: &str, copyright_year: &str, italian: bool) -> String {
 pub fn show() {
     use chrono::Local;
     use objc2::MainThreadMarker;
-    use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn, NSView};
+    use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn, NSTextField, NSTextAlignment};
     use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 
     let version = crate::version::app_version();
@@ -50,15 +50,15 @@ pub fn show() {
     let alert = NSAlert::new(mtm);
     unsafe { alert.setIcon(None) };
     alert.setMessageText(&NSString::from_str("AIUsageBar"));
-    alert.setInformativeText(&NSString::from_str(&body));
 
-    // Force alert width so the GitHub URL fits on one line without wrapping.
-    let spacer = NSView::new(mtm);
-    spacer.setFrame(NSRect {
+    // Centered body via NSTextField accessory view (NSAlert has no built-in center alignment).
+    let tf = NSTextField::wrappingLabelWithString(&NSString::from_str(&body), mtm);
+    tf.setAlignment(NSTextAlignment::Center);
+    tf.setFrame(NSRect {
         origin: NSPoint { x: 0.0, y: 0.0 },
-        size: NSSize { width: 460.0, height: 1.0 },
+        size: NSSize { width: 460.0, height: 160.0 },
     });
-    alert.setAccessoryView(Some(&spacer));
+    alert.setAccessoryView(Some(&tf));
 
     alert.addButtonWithTitle(&NSString::from_str("OK"));
     alert.addButtonWithTitle(&NSString::from_str("matteopaoli.it"));
