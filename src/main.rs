@@ -5,6 +5,7 @@ mod launch_at_login;
 mod settings;
 mod provider;
 
+use chrono::{DateTime, Local};
 use icon::{IconKind, Icons};
 use provider::claude::ClaudeProvider;
 use provider::copilot::CopilotProvider;
@@ -37,6 +38,7 @@ struct App {
     id_quit: tray_icon::menu::MenuId,
     id_refresh: tray_icon::menu::MenuId,
     providers: Vec<Box<dyn UsageProvider>>,
+    last_refreshed_at: Option<DateTime<Local>>,
 }
 
 impl App {
@@ -97,11 +99,13 @@ impl App {
 
         let refs: Vec<(&str, &UsageState)> =
             states.iter().map(|(n, s)| (*n, s)).collect();
-        let build = Self::build_menu(&refs, None);
+        let updated = self.last_refreshed_at.as_ref().map(|t| t.format("%H:%M").to_string());
+        let build = Self::build_menu(&refs, updated.as_deref());
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
         self.tray.set_menu(Some(Box::new(build.menu)));
         self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
+        self.last_refreshed_at = Some(Local::now());
     }
 }
 
@@ -166,6 +170,7 @@ fn main() {
         id_quit: build.quit,
         id_refresh: build.refresh,
         providers,
+        last_refreshed_at: None,
     };
     event_loop.run_app(&mut app).expect("event loop error");
 }
