@@ -61,7 +61,7 @@ pub fn show() {
     alert.setAccessoryView(Some(&tf));
 
     alert.addButtonWithTitle(&NSString::from_str("OK"));
-    alert.addButtonWithTitle(&NSString::from_str("matteopaoli.it"));
+    alert.addButtonWithTitle(&NSString::from_str("www.matteopaoli.it"));
     let response = alert.runModal();
     if response == NSAlertSecondButtonReturn {
         let _ = std::process::Command::new("open")
