@@ -91,7 +91,7 @@ pub fn do_copilot_fetch(
                 unlimited: false,
             });
         }
-        return UsageState::Ok(ok_windows);
+        return UsageState::Ok(ok_windows, None);
     }
 
     if stale_count > 0 {
@@ -248,7 +248,7 @@ mod tests {
             vec!["tok".to_string()],
             &|_| Ok(valid_body()),
         );
-        assert!(matches!(state, UsageState::Ok(ref w) if !w.is_empty()));
+        assert!(matches!(state, UsageState::Ok(ref w, _) if !w.is_empty()));
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
         let state = do_copilot_fetch(tokens, &|tok| {
             if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Unauthorized) }
         });
-        let UsageState::Ok(windows) = state else { panic!("expected Ok") };
+        let UsageState::Ok(windows, _) = state else { panic!("expected Ok") };
         assert!(windows.iter().any(|w| w.percent_used.is_some()), "real window missing");
         assert!(
             windows.iter().any(|w| w.percent_used.is_none() && w.name.contains("expired")),
