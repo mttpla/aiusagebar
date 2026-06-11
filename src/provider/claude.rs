@@ -160,11 +160,15 @@ fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
 
 pub struct ClaudeProvider {
     last_ok: Mutex<Option<Vec<LimitWindow>>>,
+    profile: Mutex<Option<ProfileData>>,
 }
 
 impl Default for ClaudeProvider {
     fn default() -> Self {
-        Self { last_ok: Mutex::new(None) }
+        Self {
+            last_ok: Mutex::new(None),
+            profile: Mutex::new(None),
+        }
     }
 }
 
@@ -172,10 +176,17 @@ impl ClaudeProvider {
     pub fn new() -> Self { Self::default() }
 }
 
+fn fetch_profile(token: &str, ua: &str) -> Option<ProfileData> {
+    crate::http::get(PROFILE_URL, token, &[("User-Agent", ua)])
+        .ok()
+        .and_then(|body| parse_profile_response(&body).ok())
+}
+
 fn do_fetch(
     creds: CredLoad,
     http: &dyn Fn(&str) -> Result<String, HttpError>,
     last_ok: &Mutex<Option<Vec<LimitWindow>>>,
+    profile_string: Option<String>,
 ) -> UsageState {
     let creds = match creds {
         CredLoad::NotConfigured => return UsageState::NotConfigured,
@@ -191,7 +202,7 @@ fn do_fetch(
             Ok(windows) => {
                 let windows = windows.to_vec();
                 *last_ok.lock().unwrap() = Some(windows.clone());
-                UsageState::Ok(windows, None)
+                UsageState::Ok(windows, profile_string)
             }
             Err(e) => UsageState::Error(format!("Parse error: {}", e)),
         },
@@ -203,7 +214,7 @@ fn do_fetch(
                 .lock()
                 .unwrap()
                 .clone()
-                .map(|w| UsageState::Ok(w, None))
+                .map(|w| UsageState::Ok(w, profile_string))
                 .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()))
         }
         Err(HttpError::Other(e)) => UsageState::Error(e),
@@ -215,11 +226,36 @@ impl UsageProvider for ClaudeProvider {
 
     fn fetch(&self) -> UsageState {
         let ua = get_user_agent();
-        do_fetch(
-            load_credentials(),
+        let creds = load_credentials();
+
+        {
+            let mut profile = self.profile.lock().unwrap();
+            if profile.is_none() {
+                if let CredLoad::Ok(ref c) = creds {
+                    *profile = fetch_profile(&c.access_token, ua);
+                }
+            }
+        }
+
+        let profile_string = self
+            .profile
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|p| format!("{} ({})", p.email, p.plan));
+
+        let state = do_fetch(
+            creds,
             &|token| crate::http::get(USAGE_URL, token, &[("User-Agent", ua)]),
             &self.last_ok,
-        )
+            profile_string,
+        );
+
+        if matches!(state, UsageState::Stale(_) | UsageState::Error(_)) {
+            *self.profile.lock().unwrap() = None;
+        }
+
+        state
     }
 }
 
@@ -341,7 +377,7 @@ mod tests {
 
     #[test]
     fn do_fetch_not_configured() {
-        let state = super::do_fetch(CredLoad::NotConfigured, &|_| unreachable!(), &empty_cache());
+        let state = super::do_fetch(CredLoad::NotConfigured, &|_| unreachable!(), &empty_cache(), None);
         assert_eq!(state, UsageState::NotConfigured);
     }
 
@@ -351,6 +387,7 @@ mod tests {
             CredLoad::Malformed("bad json".to_string()),
             &|_| unreachable!(),
             &empty_cache(),
+            None,
         );
         assert!(matches!(state, UsageState::Error(ref e) if e.contains("Malformed")));
     }
@@ -361,7 +398,7 @@ mod tests {
             access_token: "tok".to_string(),
             expires_at_ms: 1_000,
         });
-        let state = super::do_fetch(creds, &|_| unreachable!(), &empty_cache());
+        let state = super::do_fetch(creds, &|_| unreachable!(), &empty_cache(), None);
         assert!(matches!(state, UsageState::Stale(ref s) if s.contains("Expired on")));
     }
 
@@ -371,6 +408,7 @@ mod tests {
             ok_creds(),
             &|_| Err(HttpError::Unauthorized),
             &empty_cache(),
+            None,
         );
         assert!(matches!(state, UsageState::Stale(ref s) if s.contains("Token rejected")));
     }
@@ -381,6 +419,7 @@ mod tests {
             ok_creds(),
             &|_| Err(HttpError::RateLimited),
             &empty_cache(),
+            None,
         );
         assert!(matches!(state, UsageState::Error(ref s) if s.contains("Rate limited")));
     }
@@ -395,7 +434,7 @@ mod tests {
             resets_at: None,
             unlimited: false,
         }]));
-        let state = super::do_fetch(ok_creds(), &|_| Err(HttpError::RateLimited), &cache);
+        let state = super::do_fetch(ok_creds(), &|_| Err(HttpError::RateLimited), &cache, None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w[0].percent_used == Some(42.0)));
     }
 
@@ -405,6 +444,7 @@ mod tests {
             ok_creds(),
             &|_| Ok("garbage".to_string()),
             &empty_cache(),
+            None,
         );
         assert!(matches!(state, UsageState::Error(ref s) if s.contains("Parse error")));
     }
@@ -412,7 +452,7 @@ mod tests {
     #[test]
     fn do_fetch_200_valid_returns_ok_and_populates_cache() {
         let cache = empty_cache();
-        let state = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache);
+        let state = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache, None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w.len() == 2));
         assert_eq!(cache.lock().unwrap().as_ref().map(|v| v.len()), Some(2), "cache must be populated with 2 windows after success");
     }
@@ -442,5 +482,55 @@ mod tests {
     #[test]
     fn parse_profile_missing_account_field_is_error() {
         assert!(super::parse_profile_response("{}").is_err());
+    }
+
+    #[test]
+    fn do_fetch_passes_profile_string_into_ok() {
+        let cache = empty_cache();
+        let state = super::do_fetch(
+            ok_creds(),
+            &|_| Ok(valid_body().to_string()),
+            &cache,
+            Some("a@b.com (pro)".to_string()),
+        );
+        assert!(
+            matches!(state, UsageState::Ok(_, ref p) if p.as_deref() == Some("a@b.com (pro)")),
+            "profile string must be preserved in Ok variant"
+        );
+    }
+
+    #[test]
+    fn do_fetch_none_profile_propagates_to_ok() {
+        let cache = empty_cache();
+        let state = super::do_fetch(
+            ok_creds(),
+            &|_| Ok(valid_body().to_string()),
+            &cache,
+            None,
+        );
+        assert!(matches!(state, UsageState::Ok(_, None)));
+    }
+
+    #[test]
+    fn do_fetch_429_with_cache_includes_profile_string() {
+        let cache = Mutex::new(Some(vec![LimitWindow {
+            name: "5h session".to_string(),
+            percent_used: Some(42.0),
+            limit: None,
+            remaining: None,
+            resets_at: None,
+            unlimited: false,
+        }]));
+        let state = super::do_fetch(
+            ok_creds(),
+            &|_| Err(HttpError::RateLimited),
+            &cache,
+            Some("a@b.com (pro)".to_string()),
+        );
+        assert!(
+            matches!(state, UsageState::Ok(ref w, ref p)
+                if w[0].percent_used == Some(42.0) && p.as_deref() == Some("a@b.com (pro)")),
+            "cached Ok must carry profile string on rate limit"
+        );
     }
 }
