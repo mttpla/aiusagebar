@@ -4,6 +4,7 @@ mod keychain;
 mod launch_at_login;
 mod settings;
 mod version;
+mod about;
 mod provider;
 
 use std::time::Instant;
