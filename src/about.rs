@@ -37,8 +37,27 @@ pub fn body_text(version: &str, copyright_year: &str, italian: bool) -> String {
 
 #[cfg(target_os = "macos")]
 pub fn show() {
-    // implemented in Task 2
-    let _ = (copyright_year_str(0), is_italian(), body_text("", "", false));
+    use chrono::Local;
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn};
+    use objc2_foundation::NSString;
+
+    let version = crate::version::app_version();
+    let year_str = copyright_year_str(Local::now().year());
+    let body = body_text(&version, &year_str, is_italian());
+
+    let mtm = MainThreadMarker::new().expect("show() must be called on the main thread");
+    let alert = NSAlert::new(mtm);
+    alert.setMessageText(&NSString::from_str("AIUsageBar"));
+    alert.setInformativeText(&NSString::from_str(&body));
+    alert.addButtonWithTitle(&NSString::from_str("OK"));
+    alert.addButtonWithTitle(&NSString::from_str("matteopaoli.it"));
+    let response = alert.runModal();
+    if response == NSAlertSecondButtonReturn {
+        let _ = std::process::Command::new("open")
+            .arg("https://www.matteopaoli.it")
+            .spawn();
+    }
 }
 
 #[cfg(test)]
