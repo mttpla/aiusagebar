@@ -93,6 +93,36 @@ fn get_user_agent() -> &'static str {
 }
 
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
+const PROFILE_URL: &str = "https://api.anthropic.com/api/oauth/profile";
+
+#[derive(Deserialize)]
+struct ProfileAccount {
+    email: String,
+    has_claude_pro: bool,
+    has_claude_max: bool,
+}
+
+#[derive(Deserialize)]
+struct ProfileResponse {
+    account: ProfileAccount,
+}
+
+struct ProfileData {
+    email: String,
+    plan: String,
+}
+
+fn plan_label(has_max: bool, has_pro: bool) -> &'static str {
+    if has_max { "max" } else if has_pro { "pro" } else { "free" }
+}
+
+fn parse_profile_response(body: &str) -> Result<ProfileData, String> {
+    let resp: ProfileResponse = serde_json::from_str(body).map_err(|e| e.to_string())?;
+    Ok(ProfileData {
+        email: resp.account.email,
+        plan: plan_label(resp.account.has_claude_max, resp.account.has_claude_pro).to_string(),
+    })
+}
 
 #[derive(Deserialize)]
 struct UsageResponse {
@@ -161,7 +191,7 @@ fn do_fetch(
             Ok(windows) => {
                 let windows = windows.to_vec();
                 *last_ok.lock().unwrap() = Some(windows.clone());
-                UsageState::Ok(windows)
+                UsageState::Ok(windows, None)
             }
             Err(e) => UsageState::Error(format!("Parse error: {}", e)),
         },
@@ -173,7 +203,7 @@ fn do_fetch(
                 .lock()
                 .unwrap()
                 .clone()
-                .map(UsageState::Ok)
+                .map(|w| UsageState::Ok(w, None))
                 .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()))
         }
         Err(HttpError::Other(e)) => UsageState::Error(e),
@@ -366,7 +396,7 @@ mod tests {
             unlimited: false,
         }]));
         let state = super::do_fetch(ok_creds(), &|_| Err(HttpError::RateLimited), &cache);
-        assert!(matches!(state, UsageState::Ok(ref w) if w[0].percent_used == Some(42.0)));
+        assert!(matches!(state, UsageState::Ok(ref w, _) if w[0].percent_used == Some(42.0)));
     }
 
     #[test]
@@ -383,7 +413,34 @@ mod tests {
     fn do_fetch_200_valid_returns_ok_and_populates_cache() {
         let cache = empty_cache();
         let state = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache);
-        assert!(matches!(state, UsageState::Ok(ref w) if w.len() == 2));
+        assert!(matches!(state, UsageState::Ok(ref w, _) if w.len() == 2));
         assert_eq!(cache.lock().unwrap().as_ref().map(|v| v.len()), Some(2), "cache must be populated with 2 windows after success");
+    }
+
+    #[test]
+    fn parse_profile_max_plan() {
+        let body = r#"{"account":{"email":"a@b.com","has_claude_pro":true,"has_claude_max":true}}"#;
+        let pd = super::parse_profile_response(body).unwrap();
+        assert_eq!(pd.email, "a@b.com");
+        assert_eq!(pd.plan, "max");
+    }
+
+    #[test]
+    fn parse_profile_pro_plan() {
+        let body = r#"{"account":{"email":"a@b.com","has_claude_pro":true,"has_claude_max":false}}"#;
+        let pd = super::parse_profile_response(body).unwrap();
+        assert_eq!(pd.plan, "pro");
+    }
+
+    #[test]
+    fn parse_profile_free_plan() {
+        let body = r#"{"account":{"email":"a@b.com","has_claude_pro":false,"has_claude_max":false}}"#;
+        let pd = super::parse_profile_response(body).unwrap();
+        assert_eq!(pd.plan, "free");
+    }
+
+    #[test]
+    fn parse_profile_missing_account_field_is_error() {
+        assert!(super::parse_profile_response("{}").is_err());
     }
 }
