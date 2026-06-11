@@ -5,8 +5,10 @@ mod launch_at_login;
 mod settings;
 mod provider;
 
+use std::time::Instant;
 use chrono::{DateTime, Local};
 use icon::{IconKind, Icons};
+use settings::Settings;
 use provider::claude::ClaudeProvider;
 use provider::copilot::CopilotProvider;
 use provider::{UsageProvider, UsageState};
@@ -39,6 +41,8 @@ struct App {
     id_refresh: tray_icon::menu::MenuId,
     providers: Vec<Box<dyn UsageProvider>>,
     last_refreshed_at: Option<DateTime<Local>>,
+    settings: Settings,
+    next_poll_at: Instant,
 }
 
 impl App {
@@ -117,17 +121,23 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        event_loop.set_control_flow(ControlFlow::Wait);
+        let now = Instant::now();
+        if now >= self.next_poll_at {
+            self.refresh();
+            self.next_poll_at = now + self.settings.poll_interval;
+        }
 
         if let Ok(ev) = MenuEvent::receiver().try_recv() {
             if ev.id == self.id_quit {
                 event_loop.exit();
             } else if ev.id == self.id_refresh {
                 self.refresh();
+                self.next_poll_at = Instant::now() + self.settings.poll_interval;
             }
         }
 
         let _ = TrayIconEvent::receiver().try_recv();
+        event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_poll_at));
     }
 }
 
@@ -164,6 +174,9 @@ fn main() {
         .build()
         .expect("failed to create tray icon");
 
+    let settings = Settings::default();
+    let next_poll_at = Instant::now() + settings.poll_interval;
+
     let mut app = App {
         tray,
         icons,
@@ -171,6 +184,8 @@ fn main() {
         id_refresh: build.refresh,
         providers,
         last_refreshed_at: None,
+        settings,
+        next_poll_at,
     };
     event_loop.run_app(&mut app).expect("event loop error");
 }
