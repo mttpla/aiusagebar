@@ -2,6 +2,7 @@ mod http;
 mod icon;
 mod keychain;
 mod launch_at_login;
+mod settings;
 mod provider;
 
 use icon::{IconKind, Icons};
