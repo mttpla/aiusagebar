@@ -222,7 +222,7 @@ fn do_fetch(
 }
 
 impl UsageProvider for ClaudeProvider {
-    fn name(&self) -> &'static str { "Anthropic" }
+    fn name(&self) -> &'static str { "Claude" }
 
     fn fetch(&self) -> UsageState {
         let ua = get_user_agent();

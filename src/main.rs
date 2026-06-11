@@ -69,8 +69,12 @@ impl App {
                 UsageState::Error(msg) => {
                     append_label(&menu, format!("{} ✕  {}", name, msg));
                 }
-                UsageState::Ok(windows) => {
-                    append_label(&menu, name.to_string());
+                UsageState::Ok(windows, profile) => {
+                    let header = match profile {
+                        Some(p) => format!("{} — {}", name, p),
+                        None => format!("{} — account unavailable", name),
+                    };
+                    append_label(&menu, header);
                     for w in windows {
                         let pct = w
                             .percent_used
