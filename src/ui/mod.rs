@@ -1,5 +1,5 @@
 use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
-use crate::provider::UsageState;
+use crate::provider::{LimitWindow, UsageState};
 
 pub mod base;
 pub mod claude;
@@ -23,6 +23,7 @@ pub(crate) enum ProviderKind {
 
 pub(crate) struct MenuLayout {
     pub header_indices: Vec<(usize, ProviderKind)>,
+    pub window_items: Vec<(usize, LimitWindow)>,
     pub refresh_idx: usize,
     pub quit_idx: usize,
     pub last_updated: Option<String>,
@@ -36,15 +37,26 @@ pub(crate) fn build_layout(
 ) -> MenuLayout {
     let mut idx: usize = 2; // About(0) + separator(1)
     let mut header_indices: Vec<(usize, ProviderKind)> = Vec::new();
+    let mut window_items: Vec<(usize, LimitWindow)> = Vec::new();
 
     for (name, state) in states {
         match *name {
             "Claude" => {
                 header_indices.push((idx, ProviderKind::Claude));
+                if let UsageState::Ok(windows, _) = state {
+                    for (i, w) in windows.iter().enumerate() {
+                        window_items.push((idx + 1 + i, w.clone()));
+                    }
+                }
                 idx += claude::section_item_count(state);
             }
             "Copilot" => {
                 header_indices.push((idx, ProviderKind::Copilot));
+                if let UsageState::Ok(windows, _) = state {
+                    for (i, w) in windows.iter().enumerate() {
+                        window_items.push((idx + 1 + i, w.clone()));
+                    }
+                }
                 idx += copilot::section_item_count(state);
             }
             _ => idx += 1,
@@ -53,6 +65,7 @@ pub(crate) fn build_layout(
 
     MenuLayout {
         header_indices,
+        window_items,
         refresh_idx: idx,
         quit_idx: idx + 1,
         last_updated: last_updated.map(str::to_owned),
@@ -122,5 +135,29 @@ mod tests {
         assert_eq!(layout.header_indices[0].0, 2);
         assert_eq!(layout.refresh_idx, 5);
         assert_eq!(layout.quit_idx, 6);
+    }
+
+    #[test]
+    fn build_layout_window_items_indices() {
+        // About(0) + sep(1) + header(2) + win0(3) + win1(4) → refresh=5
+        let state = UsageState::Ok(
+            vec![
+                LimitWindow { name: "5h session".into(), percent_used: Some(39.0), ..Default::default() },
+                LimitWindow { name: "7d weekly".into(), percent_used: Some(15.0), ..Default::default() },
+            ],
+            Some("max".into()),
+        );
+        let layout = build_layout(&[("Claude", &state)], None);
+        assert_eq!(layout.window_items.len(), 2);
+        assert_eq!(layout.window_items[0].0, 3); // first window at index 3
+        assert_eq!(layout.window_items[1].0, 4);
+        assert_eq!(layout.window_items[0].1.name, "5h session");
+        assert_eq!(layout.window_items[1].1.name, "7d weekly");
+    }
+
+    #[test]
+    fn build_layout_non_ok_state_no_window_items() {
+        let layout = build_layout(&[("Claude", &UsageState::NotConfigured)], None);
+        assert!(layout.window_items.is_empty());
     }
 }
