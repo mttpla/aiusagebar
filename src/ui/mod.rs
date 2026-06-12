@@ -17,6 +17,20 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
         .expect("menu append failed");
 }
 
-pub fn build_menu(_states: &[(&str, &UsageState)], _last_updated: Option<&str>) -> MenuBuild {
-    todo!()
+pub fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
+    let menu = Menu::new();
+    for (name, state) in states {
+        match *name {
+            "Claude" => claude::append_claude_section(&menu, state),
+            "Copilot" => copilot::append_copilot_section(&menu, state),
+            _ => append_label(&menu, format!("{}: unknown provider", name)),
+        }
+    }
+    let footer = base::append_footer(&menu, last_updated);
+    MenuBuild {
+        menu,
+        about: footer.about,
+        refresh: footer.refresh,
+        quit: footer.quit,
+    }
 }
