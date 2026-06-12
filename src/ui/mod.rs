@@ -1,4 +1,4 @@
-use tray_icon::menu::{Menu, MenuId, MenuItem};
+use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
 use crate::provider::UsageState;
 
 pub mod base;
@@ -19,6 +19,10 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
 
 pub fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
     let menu = Menu::new();
+    let item_about = MenuItem::new("About AIUsageBar", true, None);
+    menu.append(&item_about).expect("menu append failed");
+    menu.append(&PredefinedMenuItem::separator())
+        .expect("menu append failed");
     for (name, state) in states {
         match *name {
             "Claude" => claude::append_claude_section(&menu, state),
@@ -29,7 +33,7 @@ pub fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) ->
     let footer = base::append_footer(&menu, last_updated);
     MenuBuild {
         menu,
-        about: footer.about,
+        about: item_about.id().clone(),
         refresh: footer.refresh,
         quit: footer.quit,
     }

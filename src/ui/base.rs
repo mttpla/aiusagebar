@@ -1,7 +1,6 @@
 use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
 
-pub struct FooterIds {
-    pub about: MenuId,
+pub(crate) struct FooterIds {
     pub refresh: MenuId,
     pub quit: MenuId,
 }
@@ -10,22 +9,17 @@ pub(crate) fn refresh_label(updated: Option<&str>) -> Option<String> {
     updated.map(|ts| format!("Updated: {}", ts))
 }
 
-pub fn append_footer(menu: &Menu, updated: Option<&str>) -> FooterIds {
+pub(crate) fn append_footer(menu: &Menu, updated: Option<&str>) -> FooterIds {
     if let Some(label) = refresh_label(updated) {
-        super::append_label(menu, label);
+        super::append_label(menu, label); // TODO: i18n
+        menu.append(&PredefinedMenuItem::separator())
+            .expect("menu append failed");
     }
-    menu.append(&PredefinedMenuItem::separator())
-        .expect("menu append failed");
     let item_refresh = MenuItem::new("Refresh", true, None);
-    menu.append(&item_refresh).expect("menu append failed");
-    menu.append(&PredefinedMenuItem::separator())
-        .expect("menu append failed");
-    let item_about = MenuItem::new("About AIUsageBar", true, None);
     let item_quit = MenuItem::new("Quit", true, None);
-    menu.append(&item_about).expect("menu append failed");
+    menu.append(&item_refresh).expect("menu append failed");
     menu.append(&item_quit).expect("menu append failed");
     FooterIds {
-        about: item_about.id().clone(),
         refresh: item_refresh.id().clone(),
         quit: item_quit.id().clone(),
     }

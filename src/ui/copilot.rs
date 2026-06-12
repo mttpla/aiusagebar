@@ -1,6 +1,16 @@
 use tray_icon::menu::Menu;
 use crate::provider::{LimitWindow, UsageState};
 
+pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
+    match state {
+        UsageState::Ok(_, Some(p)) => format!("{} — {}", name, p),
+        UsageState::Ok(_, None) => format!("{} — account unavailable", name),
+        UsageState::Stale(msg) => format!("{} ⚠  {}", name, msg),
+        UsageState::Error(msg) => format!("{} ✕  {}", name, msg),
+        UsageState::NotConfigured => format!("{}: not configured", name),
+    }
+}
+
 pub(crate) fn row_label(window: &LimitWindow) -> String {
     let pct = window
         .percent_used
@@ -10,26 +20,11 @@ pub(crate) fn row_label(window: &LimitWindow) -> String {
     format!("  {} — {}  resets {}", window.name, pct, reset)
 }
 
-pub fn append_copilot_section(menu: &Menu, state: &UsageState) {
-    match state {
-        UsageState::NotConfigured => {
-            super::append_label(menu, "Copilot: not configured");
-        }
-        UsageState::Stale(msg) => {
-            super::append_label(menu, format!("Copilot ⚠  {}", msg));
-        }
-        UsageState::Error(msg) => {
-            super::append_label(menu, format!("Copilot ✕  {}", msg));
-        }
-        UsageState::Ok(windows, profile) => {
-            let header = match profile {
-                Some(p) => format!("Copilot — {}", p),
-                None => "Copilot — account unavailable".to_string(),
-            };
-            super::append_label(menu, header);
-            for w in windows {
-                super::append_label(menu, row_label(w));
-            }
+pub(crate) fn append_copilot_section(menu: &Menu, state: &UsageState) {
+    super::append_label(menu, header_label("Copilot", state));
+    if let UsageState::Ok(windows, _) = state {
+        for w in windows {
+            super::append_label(menu, row_label(w));
         }
     }
 }

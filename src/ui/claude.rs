@@ -16,7 +16,7 @@ pub(crate) fn pct_label(pct: Option<f32>) -> String {
         .unwrap_or_else(|| "—".to_string())
 }
 
-pub fn append_claude_section(menu: &Menu, state: &UsageState) {
+pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) {
     super::append_label(menu, header_label("Claude", state));
     if let UsageState::Ok(windows, _) = state {
         for w in windows {
