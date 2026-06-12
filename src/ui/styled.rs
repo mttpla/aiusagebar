@@ -4,10 +4,11 @@ use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::AnyThread;
 use objc2_app_kit::{
-    NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSMenu,
-    NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignment, NSTextTab,
+    NSBox, NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSMenu,
+    NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignment, NSTextField,
+    NSTextTab, NSView,
 };
-use objc2_foundation::{NSArray, NSDictionary, NSMutableAttributedString, NSRange, NSString};
+use objc2_foundation::{NSArray, NSDictionary, NSMutableAttributedString, NSPoint, NSRange, NSRect, NSSize, NSString};
 use tray_icon::menu::{ContextMenu, Menu};
 
 use super::{MenuLayout, ProviderKind};
@@ -123,6 +124,54 @@ fn refresh_attr_str(updated: Option<&str>) -> Retained<NSMutableAttributedString
     mattr
 }
 
+// ── Progress bar helpers ───────────────────────────────────────────────────
+
+fn bar_fill_color(pct: f32) -> Retained<NSColor> {
+    if pct < 60.0 {
+        srgb(0.204, 0.780, 0.349) // #34C759 green
+    } else if pct <= 80.0 {
+        srgb(1.0, 0.624, 0.039)   // #FF9F0A amber
+    } else {
+        srgb(1.0, 0.231, 0.188)   // #FF3B30 red
+    }
+}
+
+fn bar_fill_width(pct: Option<f32>) -> f64 {
+    pct.map(|p| (p / 100.0 * 270.0) as f64)
+        .unwrap_or(0.0)
+        .clamp(0.0, 270.0)
+}
+
+fn format_reset(window: &crate::provider::LimitWindow) -> String {
+    use chrono::DateTime;
+    let Some(ref resets_at) = window.resets_at else {
+        return String::new();
+    };
+    let name = window.name.to_lowercase();
+    if name.contains("5h") || name.contains("session") {
+        if let Ok(dt) = DateTime::parse_from_rfc3339(resets_at) {
+            let now = chrono::Local::now();
+            let secs = dt.signed_duration_since(now).num_seconds().max(0);
+            let h = secs / 3600;
+            let m = (secs % 3600) / 60;
+            return if h > 0 {
+                format!("resets in {}h {}m", h, m)
+            } else {
+                format!("resets in {}m", m)
+            };
+        }
+        resets_at.clone()
+    } else if name.contains("7d") || name.contains("weekly") {
+        if let Ok(dt) = DateTime::parse_from_rfc3339(resets_at) {
+            let local = dt.with_timezone(&chrono::Local);
+            return format!("resets {}", local.format("%b %-d"));
+        }
+        resets_at.clone()
+    } else {
+        format!("resets {}", resets_at)
+    }
+}
+
 // ── Style pass ─────────────────────────────────────────────────────────────
 
 unsafe fn apply_to_item(ns_menu: &NSMenu, idx: usize, attr: &NSMutableAttributedString) {
@@ -157,5 +206,84 @@ pub(super) fn style_menu(menu: &Menu, layout: &MenuLayout) {
 
         let quit = quit_attr_str();
         apply_to_item(ns_menu, layout.quit_idx, &quit);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::provider::LimitWindow;
+
+    fn make_window(name: &str, pct: Option<f32>, resets_at: Option<&str>) -> LimitWindow {
+        LimitWindow {
+            name: name.to_owned(),
+            percent_used: pct,
+            resets_at: resets_at.map(str::to_owned),
+            ..Default::default()
+        }
+    }
+
+    // bar_fill_width
+
+    #[test]
+    fn bar_fill_width_50_pct() {
+        let w = bar_fill_width(Some(50.0));
+        assert!((w - 135.0).abs() < 0.01, "got {w}");
+    }
+
+    #[test]
+    fn bar_fill_width_100_pct() {
+        let w = bar_fill_width(Some(100.0));
+        assert!((w - 270.0).abs() < 0.01, "got {w}");
+    }
+
+    #[test]
+    fn bar_fill_width_over_100_clamped() {
+        assert!((bar_fill_width(Some(150.0)) - 270.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn bar_fill_width_none_is_zero() {
+        assert_eq!(bar_fill_width(None), 0.0);
+    }
+
+    // format_reset
+
+    #[test]
+    fn format_reset_none_resets_at_returns_empty() {
+        let w = make_window("5h session", None, None);
+        assert_eq!(format_reset(&w), "");
+    }
+
+    #[test]
+    fn format_reset_7d_window_returns_absolute_date() {
+        let w = make_window("7d weekly", None, Some("2026-06-20T08:00:00Z"));
+        assert_eq!(format_reset(&w), "resets Jun 20");
+    }
+
+    #[test]
+    fn format_reset_5h_window_future_returns_relative_format() {
+        use chrono::{Duration, Local};
+        let future = (Local::now() + Duration::hours(3) + Duration::minutes(30))
+            .to_rfc3339();
+        let w = make_window("5h session", None, Some(&future));
+        let s = format_reset(&w);
+        assert!(s.starts_with("resets in"), "got: {s}");
+        assert!(s.contains('h') || s.contains('m'), "got: {s}");
+    }
+
+    #[test]
+    fn format_reset_5h_window_past_returns_zero() {
+        let past = "2020-01-01T00:00:00Z";
+        let w = make_window("5h session", None, Some(past));
+        let s = format_reset(&w);
+        assert_eq!(s, "resets in 0m", "got: {s}");
+    }
+
+    #[test]
+    fn format_reset_unknown_window_returns_raw_with_prefix() {
+        let w = make_window("Daily", None, Some("2026-06-20T08:00:00Z"));
+        let s = format_reset(&w);
+        assert_eq!(s, "resets 2026-06-20T08:00:00Z");
     }
 }
