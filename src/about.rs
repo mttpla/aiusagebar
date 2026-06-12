@@ -52,6 +52,9 @@ pub fn show() {
     let alert = NSAlert::new(mtm);
     let icon_data = NSData::with_bytes(ABOUT_ICON);
     let icon = NSImage::initWithData(NSImage::alloc(), &icon_data);
+    if let Some(ref img) = icon {
+        img.setTemplate(true);
+    }
     unsafe { alert.setIcon(icon.as_deref()) };
     alert.setMessageText(&NSString::from_str(&format!("AIUsageBar {version}")));
 
@@ -124,12 +127,13 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn about_icon_is_valid_png() {
-        // PNG magic bytes: 0x89 P N G \r \n 0x1A \n
-        const PNG_MAGIC: &[u8] = b"\x89PNG\r\n\x1a\n";
+        use image::GenericImageView;
+        let img = image::load_from_memory(ABOUT_ICON).expect("ABOUT_ICON must be a valid PNG");
+        assert_eq!(img.width(), 128, "icon must be 128px wide");
+        assert_eq!(img.height(), 128, "icon must be 128px tall");
         assert!(
-            ABOUT_ICON.starts_with(PNG_MAGIC),
-            "ABOUT_ICON must start with PNG magic bytes"
+            img.pixels().any(|(_, _, p)| p.0[3] > 0),
+            "icon must have at least one non-transparent pixel"
         );
-        assert!(ABOUT_ICON.len() > 128, "ABOUT_ICON must have non-trivial content");
     }
 }
