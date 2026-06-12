@@ -40,9 +40,9 @@ pub fn body_text(copyright_year: &str, italian: bool) -> String {
 #[cfg(target_os = "macos")]
 pub fn show() {
     use chrono::Local;
-    use objc2::MainThreadMarker;
-    use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn, NSTextField, NSTextAlignment};
-    use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
+    use objc2::{AnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn, NSImage, NSTextField, NSTextAlignment};
+    use objc2_foundation::{NSData, NSPoint, NSRect, NSSize, NSString};
 
     let version = crate::version::app_version();
     let year_str = copyright_year_str(Local::now().year());
@@ -50,7 +50,9 @@ pub fn show() {
 
     let mtm = MainThreadMarker::new().expect("show() must be called on the main thread");
     let alert = NSAlert::new(mtm);
-    unsafe { alert.setIcon(None) };
+    let icon_data = NSData::with_bytes(ABOUT_ICON);
+    let icon = NSImage::initWithData(NSImage::alloc(), &icon_data);
+    unsafe { alert.setIcon(icon.as_deref()) };
     alert.setMessageText(&NSString::from_str(&format!("AIUsageBar {version}")));
 
     // Centered body via NSTextField accessory view (NSAlert has no built-in center alignment).
