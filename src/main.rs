@@ -16,7 +16,7 @@ use provider::claude::ClaudeProvider;
 use provider::copilot::CopilotProvider;
 use provider::{UsageProvider, UsageState};
 use tray_icon::{
-    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
+    menu::MenuEvent,
     TrayIconBuilder, TrayIconEvent,
 };
 use winit::application::ApplicationHandler;
@@ -25,18 +25,6 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 #[cfg(target_os = "macos")]
 use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 use winit::window::WindowId;
-
-struct MenuBuild {
-    menu: Menu,
-    about: tray_icon::menu::MenuId,
-    refresh: tray_icon::menu::MenuId,
-    quit: tray_icon::menu::MenuId,
-}
-
-fn append_label(menu: &Menu, text: impl Into<String>) {
-    menu.append(&MenuItem::new(text.into(), false, None))
-        .expect("menu append failed");
-}
 
 struct App {
     tray: tray_icon::TrayIcon,
@@ -51,63 +39,6 @@ struct App {
 }
 
 impl App {
-    fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
-        let menu = Menu::new();
-
-        let item_about = MenuItem::new("About AIUsageBar", true, None);
-        menu.append(&item_about).expect("menu append failed");
-        menu.append(&PredefinedMenuItem::separator())
-            .expect("menu append failed");
-
-        for (name, state) in states {
-            match state {
-                UsageState::NotConfigured => {
-                    append_label(&menu, format!("{}: not configured", name));
-                }
-                UsageState::Stale(msg) => {
-                    append_label(&menu, format!("{} ⚠  {}", name, msg));
-                }
-                UsageState::Error(msg) => {
-                    append_label(&menu, format!("{} ✕  {}", name, msg));
-                }
-                UsageState::Ok(windows, profile) => {
-                    let header = match profile {
-                        Some(p) => format!("{} — {}", name, p),
-                        None => format!("{} — account unavailable", name),
-                    };
-                    append_label(&menu, header);
-                    for w in windows {
-                        let pct = w
-                            .percent_used
-                            .map(|p| format!("{:.1}%", p))
-                            .unwrap_or_else(|| "—".to_string());
-                        let reset = w.resets_at.as_deref().unwrap_or("?");
-                        append_label(
-                            &menu,
-                            format!("  {} — {}  resets {}", w.name, pct, reset),
-                        );
-                    }
-                }
-            }
-        }
-        if let Some(ts) = last_updated {
-            // TODO: i18n
-            append_label(&menu, format!("Updated: {}", ts));
-            menu.append(&PredefinedMenuItem::separator())
-                .expect("menu append failed");
-        }
-        let item_refresh = MenuItem::new("Refresh", true, None);
-        let item_quit = MenuItem::new("Quit", true, None);
-        menu.append(&item_refresh).expect("menu append failed");
-        menu.append(&item_quit).expect("menu append failed");
-        MenuBuild {
-            about: item_about.id().clone(),
-            refresh: item_refresh.id().clone(),
-            quit: item_quit.id().clone(),
-            menu,
-        }
-    }
-
     fn refresh(&mut self) {
         let states: Vec<(&str, UsageState)> = self.providers
             .iter()
@@ -121,7 +52,7 @@ impl App {
             states.iter().map(|(n, s)| (*n, s)).collect();
         let now = Local::now();
         let updated = now.format("%H:%M").to_string();
-        let build = Self::build_menu(&refs, Some(&updated));
+        let build = ui::build_menu(&refs, Some(&updated));
         self.id_about = build.about;
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
@@ -187,7 +118,7 @@ fn main() {
         .iter()
         .map(|p| (p.name(), &initial_state))
         .collect();
-    let build = App::build_menu(&initial_refs, None);
+    let build = ui::build_menu(&initial_refs, None);
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(build.menu))
