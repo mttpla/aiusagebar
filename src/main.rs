@@ -6,6 +6,7 @@ mod settings;
 mod version;
 mod about;
 mod provider;
+mod ui;
 
 use std::time::Instant;
 use chrono::{DateTime, Local};
