@@ -2,6 +2,9 @@ use chrono::Datelike;
 
 const START_YEAR: i32 = 2026;
 
+#[cfg(target_os = "macos")]
+const ABOUT_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/about-icon.png"));
+
 pub fn copyright_year_str(current_year: i32) -> String {
     if current_year == START_YEAR {
         START_YEAR.to_string()
@@ -114,5 +117,17 @@ mod tests {
         let body = body_text("2026", false);
         assert!(body.contains("as is"));
         assert!(body.contains("not liable"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn about_icon_is_valid_png() {
+        // PNG magic bytes: 0x89 P N G \r \n 0x1A \n
+        const PNG_MAGIC: &[u8] = b"\x89PNG\r\n\x1a\n";
+        assert!(
+            ABOUT_ICON.starts_with(PNG_MAGIC),
+            "ABOUT_ICON must start with PNG magic bytes"
+        );
+        assert!(ABOUT_ICON.len() > 128, "ABOUT_ICON must have non-trivial content");
     }
 }
