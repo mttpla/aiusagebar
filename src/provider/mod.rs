@@ -1,7 +1,7 @@
 pub mod claude;
 pub mod copilot;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct LimitWindow {
     pub name: String,
     pub percent_used: Option<f32>,
@@ -22,4 +22,16 @@ pub enum UsageState {
 pub trait UsageProvider: Send + Sync {
     fn name(&self) -> &'static str;
     fn fetch(&self) -> UsageState;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn limit_window_default() {
+        let w = LimitWindow::default();
+        assert_eq!(w.name, "");
+        assert!(w.percent_used.is_none());
+    }
 }

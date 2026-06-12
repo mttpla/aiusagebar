@@ -16,8 +16,18 @@ pub(crate) fn pct_label(pct: Option<f32>) -> String {
         .unwrap_or_else(|| "—".to_string())
 }
 
-pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) {
+/// Returns the number of NSMenu items that `append_claude_section` will append:
+/// 1 header + 1 per window when `UsageState::Ok`.
+pub(crate) fn section_item_count(state: &UsageState) -> usize {
+    match state {
+        UsageState::Ok(windows, _) => 1 + windows.len(),
+        _ => 1,
+    }
+}
+
+pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> usize {
     super::append_label(menu, header_label("Claude", state));
+    let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
         for w in windows {
             let reset = w.resets_at.as_deref().unwrap_or("?");
@@ -25,14 +35,16 @@ pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) {
                 menu,
                 format!("  {} — {}  resets {}", w.name, pct_label(w.percent_used), reset),
             );
+            count += 1;
         }
     }
+    count
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::provider::UsageState;
+    use crate::provider::{LimitWindow, UsageState};
 
     fn make_ok(profile: Option<&str>) -> UsageState {
         UsageState::Ok(vec![], profile.map(str::to_owned))
@@ -80,5 +92,22 @@ mod tests {
     #[test]
     fn pct_none() {
         assert_eq!(pct_label(None), "—");
+    }
+
+    #[test]
+    fn append_claude_section_count_ok_two_windows() {
+        let state = UsageState::Ok(
+            vec![
+                LimitWindow { name: "daily".into(), percent_used: Some(50.0), ..Default::default() },
+                LimitWindow { name: "monthly".into(), percent_used: Some(20.0), ..Default::default() },
+            ],
+            Some("max".into()),
+        );
+        assert_eq!(section_item_count(&state), 3); // 1 header + 2 windows
+    }
+
+    #[test]
+    fn append_claude_section_count_not_configured() {
+        assert_eq!(section_item_count(&UsageState::NotConfigured), 1);
     }
 }

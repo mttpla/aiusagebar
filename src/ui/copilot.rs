@@ -20,13 +20,25 @@ pub(crate) fn row_label(window: &LimitWindow) -> String {
     format!("  {} — {}  resets {}", window.name, pct, reset)
 }
 
-pub(crate) fn append_copilot_section(menu: &Menu, state: &UsageState) {
+/// Returns the number of NSMenu items that `append_copilot_section` will append:
+/// 1 header + 1 per window when `UsageState::Ok`.
+pub(crate) fn section_item_count(state: &UsageState) -> usize {
+    match state {
+        UsageState::Ok(windows, _) => 1 + windows.len(),
+        _ => 1,
+    }
+}
+
+pub(crate) fn append_copilot_section(menu: &Menu, state: &UsageState) -> usize {
     super::append_label(menu, header_label("Copilot", state));
+    let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
         for w in windows {
             super::append_label(menu, row_label(w));
+            count += 1;
         }
     }
+    count
 }
 
 #[cfg(test)]
@@ -55,5 +67,21 @@ mod tests {
     fn row_no_pct_no_reset() {
         let w = make_window("Daily", None, None);
         assert_eq!(row_label(&w), "  Daily — —  resets ?");
+    }
+
+    #[test]
+    fn append_copilot_section_count_ok_one_window() {
+        use crate::provider::UsageState;
+        let state = UsageState::Ok(
+            vec![make_window("monthly", Some(10.0), None)],
+            None,
+        );
+        assert_eq!(section_item_count(&state), 2); // 1 header + 1 window
+    }
+
+    #[test]
+    fn append_copilot_section_count_not_configured() {
+        use crate::provider::UsageState;
+        assert_eq!(section_item_count(&UsageState::NotConfigured), 1);
     }
 }
