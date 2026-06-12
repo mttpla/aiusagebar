@@ -64,7 +64,7 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
         .expect("menu append failed");
 }
 
-pub fn build_menu(states: &[(&str, &UsageState)], _last_updated: Option<&str>) -> MenuBuild {
+pub fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
     let menu = Menu::new();
     let item_about = MenuItem::new("About AIUsageBar", true, None);
     menu.append(&item_about).expect("menu append failed");
@@ -78,6 +78,14 @@ pub fn build_menu(states: &[(&str, &UsageState)], _last_updated: Option<&str>) -
         }
     }
     let footer = base::append_footer(&menu);
+    let layout = build_layout(states, last_updated);
+
+    #[cfg(target_os = "macos")]
+    styled::style_menu(&menu, &layout);
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = layout;
+
     MenuBuild {
         menu,
         about: item_about.id().clone(),

@@ -15,7 +15,7 @@ use super::{MenuLayout, ProviderKind};
 // ── Color ──────────────────────────────────────────────────────────────────
 
 fn srgb(r: f64, g: f64, b: f64) -> Retained<NSColor> {
-    unsafe { NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, 1.0) }
+    NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, 1.0)
 }
 
 // ── Low-level attribute setters ────────────────────────────────────────────
@@ -132,7 +132,7 @@ fn refresh_attr_str(updated: Option<&str>) -> Retained<NSMutableAttributedString
 // ── Style pass ─────────────────────────────────────────────────────────────
 
 unsafe fn apply_to_item(ns_menu: &NSMenu, idx: usize, attr: &NSMutableAttributedString) {
-    if let Some(item) = unsafe { ns_menu.itemAtIndex(idx as isize) } {
+    if let Some(item) = ns_menu.itemAtIndex(idx as isize) {
         item.setAttributedTitle(Some(attr));
     }
 }
