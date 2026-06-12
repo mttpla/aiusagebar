@@ -17,7 +17,7 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
         .expect("menu append failed");
 }
 
-pub fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
+pub fn build_menu(states: &[(&str, &UsageState)], _last_updated: Option<&str>) -> MenuBuild {
     let menu = Menu::new();
     let item_about = MenuItem::new("About AIUsageBar", true, None);
     menu.append(&item_about).expect("menu append failed");
@@ -30,7 +30,7 @@ pub fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) ->
             _ => append_label(&menu, format!("{}: unknown provider", name)),
         }
     }
-    let footer = base::append_footer(&menu, last_updated);
+    let footer = base::append_footer(&menu);
     MenuBuild {
         menu,
         about: item_about.id().clone(),
