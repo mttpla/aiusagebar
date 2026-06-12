@@ -5,6 +5,9 @@ pub mod base;
 pub mod claude;
 pub mod copilot;
 
+#[cfg(target_os = "macos")]
+pub(crate) mod styled;
+
 pub struct MenuBuild {
     pub menu: Menu,
     pub about: MenuId,
