@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 After every brainstorming session that produces a spec, create a kanban card in `docs/kanban/` before invoking `writing-plans`. The card narrative must capture all key decisions and rejected options.
 
+After finishing any spec, before creating the kanban card or writing a plan, ask whether to split it. Present a concrete proposal: a list of N smaller scopes, one line each. The user decides. Never skip this check — a spec that looks manageable during writing often becomes an oversized card during implementation.
+
 ## Commands
 
 ### One-time dev setup (per machine)
