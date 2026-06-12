@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn build_layout_window_items_indices() {
+    fn build_layout_claude_window_items_indices() {
         // About(0) + sep(1) + header(2) + win0(3) + win1(4) → refresh=5
         let state = UsageState::Ok(
             vec![
@@ -153,6 +153,30 @@ mod tests {
         assert_eq!(layout.window_items[1].0, 4);
         assert_eq!(layout.window_items[0].1.name, "5h session");
         assert_eq!(layout.window_items[1].1.name, "7d weekly");
+    }
+
+    #[test]
+    fn build_layout_copilot_window_items_indices() {
+        use crate::provider::LimitWindow;
+        let claude_state = UsageState::Ok(
+            vec![
+                LimitWindow { name: "5h session".into(), ..Default::default() },
+                LimitWindow { name: "7d weekly".into(), ..Default::default() },
+            ],
+            Some("max".into()),
+        );
+        let copilot_state = UsageState::Ok(
+            vec![LimitWindow { name: "monthly".into(), ..Default::default() }],
+            None,
+        );
+        let layout = build_layout(&[("Claude", &claude_state), ("Copilot", &copilot_state)], None);
+        // Claude windows at 3, 4; Copilot window at 6
+        assert_eq!(layout.window_items.len(), 3);
+        assert_eq!(layout.window_items[0].0, 3);
+        assert_eq!(layout.window_items[1].0, 4);
+        assert_eq!(layout.window_items[2].0, 6);
+        assert_eq!(layout.window_items[2].1.name, "monthly");
+        assert_eq!(layout.refresh_idx, 7);
     }
 
     #[test]
