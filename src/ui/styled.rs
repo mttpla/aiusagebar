@@ -22,25 +22,19 @@ fn srgb(r: f64, g: f64, b: f64) -> Retained<NSColor> {
 
 unsafe fn set_color(mattr: &NSMutableAttributedString, color: &NSColor, range: NSRange) {
     let value: &AnyObject = &*(color as *const NSColor as *const AnyObject);
-    unsafe {
-        mattr.addAttribute_value_range(NSForegroundColorAttributeName, value, range);
-    }
+    mattr.addAttribute_value_range(NSForegroundColorAttributeName, value, range);
 }
 
 unsafe fn set_font(mattr: &NSMutableAttributedString, font: &NSFont, range: NSRange) {
     let value: &AnyObject = &*(font as *const NSFont as *const AnyObject);
-    unsafe {
-        mattr.addAttribute_value_range(NSFontAttributeName, value, range);
-    }
+    mattr.addAttribute_value_range(NSFontAttributeName, value, range);
 }
 
 unsafe fn set_para_style(mattr: &NSMutableAttributedString, style: &NSMutableParagraphStyle) {
     let len = mattr.length();
     let range = NSRange { location: 0, length: len };
     let value: &AnyObject = &*(style as *const NSMutableParagraphStyle as *const AnyObject);
-    unsafe {
-        mattr.addAttribute_value_range(NSParagraphStyleAttributeName, value, range);
-    }
+    mattr.addAttribute_value_range(NSParagraphStyleAttributeName, value, range);
 }
 
 // ── Paragraph style: right tab stop at 290pt ───────────────────────────────
