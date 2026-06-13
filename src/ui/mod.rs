@@ -19,8 +19,6 @@ pub(crate) struct MenuLayout {
     pub header_indices: Vec<(usize, ProviderKind)>,
     pub window_items: Vec<(usize, LimitWindow)>,
     pub refresh_idx: usize,
-    #[allow(dead_code)]
-    pub about_idx: usize,
     pub quit_idx: usize,
     pub last_updated: Option<String>,
 }
@@ -48,12 +46,11 @@ pub(crate) fn build_layout(
         };
     }
 
-    // Footer layout: Refresh, separator, About, Quit
+    // Footer layout: Refresh(idx), separator(idx+1), About(idx+2), Quit(idx+3)
     MenuLayout {
         header_indices,
         window_items,
         refresh_idx: idx,
-        about_idx: idx + 2,
         quit_idx: idx + 3,
         last_updated: last_updated.map(str::to_owned),
     }
@@ -99,7 +96,6 @@ mod tests {
         // Refresh(0) + sep(1) + About(2) + Quit(3)
         let layout = build_layout(&[], None);
         assert_eq!(layout.refresh_idx, 0);
-        assert_eq!(layout.about_idx, 2);
         assert_eq!(layout.quit_idx, 3);
         assert!(layout.header_indices.is_empty());
     }
@@ -116,7 +112,6 @@ mod tests {
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None);
         assert_eq!(layout.header_indices[0].0, 0);
         assert_eq!(layout.refresh_idx, 3);
-        assert_eq!(layout.about_idx, 5);
         assert_eq!(layout.quit_idx, 6);
     }
 
@@ -161,7 +156,6 @@ mod tests {
         assert_eq!(layout.window_items[2].0, 4);
         assert_eq!(layout.window_items[2].1.name, "monthly");
         assert_eq!(layout.refresh_idx, 5);
-        assert_eq!(layout.about_idx, 7);
         assert_eq!(layout.quit_idx, 8);
     }
 
