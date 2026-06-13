@@ -222,7 +222,7 @@ fn do_fetch(
 }
 
 impl UsageProvider for ClaudeProvider {
-    fn name(&self) -> &'static str { "Claude" }
+    fn kind(&self) -> crate::provider::ProviderKind { crate::provider::ProviderKind::Claude }
 
     fn fetch(&self) -> UsageState {
         let ua = get_user_agent();

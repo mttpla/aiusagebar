@@ -1,5 +1,5 @@
 use tray_icon::menu::Menu;
-use crate::provider::{LimitWindow, UsageState};
+use crate::provider::{LimitWindow, ProviderKind, UsageState};
 
 pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
     match state {
@@ -30,7 +30,7 @@ pub(crate) fn section_item_count(state: &UsageState) -> usize {
 }
 
 pub(crate) fn append_copilot_section(menu: &Menu, state: &UsageState) -> usize {
-    super::append_label(menu, header_label("Copilot", state));
+    super::append_label(menu, header_label(ProviderKind::Copilot.display_name(), state));
     let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
         for w in windows {

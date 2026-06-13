@@ -11,7 +11,8 @@ use objc2_app_kit::{
 use objc2_foundation::{NSArray, NSDictionary, NSMutableAttributedString, NSPoint, NSRange, NSRect, NSSize, NSString};
 use tray_icon::menu::{ContextMenu, Menu};
 
-use super::{MenuLayout, ProviderKind};
+use super::MenuLayout;
+use crate::provider::ProviderKind;
 
 // ── Color ──────────────────────────────────────────────────────────────────
 
