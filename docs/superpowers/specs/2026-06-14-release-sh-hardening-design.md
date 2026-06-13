@@ -144,6 +144,26 @@ Manual acceptance checklist:
 
 Document this checklist as the test plan in the kanban card; do not commit a manual-test script.
 
+## CHANGELOG.md tag prefix
+
+`cliff.toml:5` currently strips the `v` prefix from version headings:
+
+```
+## [{{ version | trim_start_matches(pat="v") }}] - ...
+```
+
+so the current `CHANGELOG.md` reads `## [0.2.0] - 2026-06-13`. We want headings to match tag names exactly (`## [v0.2.0]`), both because tags carry the `v` prefix and because the GitHub Action workflow (#37) extracts release-body sections by tag name.
+
+Changes folded into this card:
+
+1. Edit `cliff.toml` to remove the trim filter:
+   ```
+   ## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+   ```
+2. Backfill the existing `CHANGELOG.md` heading: `## [0.2.0]` → `## [v0.2.0]`. One-line manual edit; no need to re-run `git-cliff`. Same edit applies to any `## [Unreleased]` placeholder if present at PR time (today it is not).
+
+`release.sh` already calls `git-cliff --tag "v$NEW"`, so the `version` template variable will render as `v0.3.0`, `v0.4.0`, etc. — no script change needed.
+
 ## Dependencies
 
 No new tools. Already required: `bash`, `git`, `git-cliff` (Homebrew, already documented in script).
