@@ -182,6 +182,11 @@ fn format_reset(window: &crate::provider::LimitWindow) -> String {
         }
         resets_at.clone()
     } else {
+        // Default (Copilot windows, unknown names): short local date, fallback to raw.
+        if let Ok(dt) = DateTime::parse_from_rfc3339(resets_at) {
+            let local = dt.with_timezone(&chrono::Local);
+            return format!("resets {}", local.format("%b %-d"));
+        }
         format!("resets {}", resets_at)
     }
 }
@@ -223,9 +228,10 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
     };
     pct_field.setTextColor(Some(&pct_text_color));
     pct_field.setAlignment(NSTextAlignment::Right);
+    // Right edge at x=290 to match the Refresh row tab stop (refresh_para_style → 290pt).
     pct_field.setFrame(NSRect {
         origin: NSPoint { x: 163.0, y: 26.0 },
-        size: NSSize { width: 119.0, height: 14.0 },
+        size: NSSize { width: 127.0, height: 14.0 },
     });
     container.addSubview(&pct_field);
 
@@ -395,9 +401,28 @@ mod tests {
     }
 
     #[test]
-    fn format_reset_unknown_window_returns_raw_with_prefix() {
-        let w = make_window("Daily", None, Some("2026-06-20T08:00:00Z"));
-        let s = format_reset(&w);
-        assert_eq!(s, "resets 2026-06-20T08:00:00Z");
+    fn format_reset_unknown_window_formats_as_short_date() {
+        use chrono::DateTime;
+        let ts = "2026-06-20T08:00:00Z";
+        let dt = DateTime::parse_from_rfc3339(ts).unwrap();
+        let expected = format!("resets {}", dt.with_timezone(&chrono::Local).format("%b %-d"));
+        let w = make_window("Daily", None, Some(ts));
+        assert_eq!(format_reset(&w), expected);
+    }
+
+    #[test]
+    fn format_reset_copilot_window_formats_as_short_date() {
+        use chrono::DateTime;
+        let ts = "2026-07-01T00:00:00.000Z";
+        let dt = DateTime::parse_from_rfc3339(ts).unwrap();
+        let expected = format!("resets {}", dt.with_timezone(&chrono::Local).format("%b %-d"));
+        let w = make_window("matteo / premium_interactions", None, Some(ts));
+        assert_eq!(format_reset(&w), expected);
+    }
+
+    #[test]
+    fn format_reset_unparseable_falls_back_to_raw() {
+        let w = make_window("monthly", None, Some("not-a-date"));
+        assert_eq!(format_reset(&w), "resets not-a-date");
     }
 }
