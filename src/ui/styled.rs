@@ -73,6 +73,19 @@ fn header_attr_str(text: &str, r: f64, g: f64, b: f64) -> Retained<NSMutableAttr
     mattr
 }
 
+/// About item: system labelColor, 13pt — matches Refresh/Quit weight.
+fn about_attr_str() -> Retained<NSMutableAttributedString> {
+    let ns_text = NSString::from_str("ℹ About AIUsageBar");
+    let mattr =
+        NSMutableAttributedString::initWithString(NSMutableAttributedString::alloc(), &ns_text);
+    let range = NSRange { location: 0, length: ns_text.length() };
+    unsafe {
+        set_color(&mattr, &NSColor::labelColor(), range);
+        set_font(&mattr, &NSFont::systemFontOfSize(13.0), range);
+    }
+    mattr
+}
+
 /// Quit item: red #FF3B30, 13pt.
 fn quit_attr_str() -> Retained<NSMutableAttributedString> {
     let ns_text = NSString::from_str("Quit");
@@ -288,6 +301,11 @@ pub(super) fn style_menu(menu: &Menu, layout: &MenuLayout) {
 
         let refresh = refresh_attr_str(layout.last_updated.as_deref());
         apply_to_item(ns_menu, layout.refresh_idx, &refresh);
+
+        // Footer order in append_footer: Refresh, separator, About, Quit
+        // → About sits at refresh_idx + 2.
+        let about = about_attr_str();
+        apply_to_item(ns_menu, layout.refresh_idx + 2, &about);
 
         let quit = quit_attr_str();
         apply_to_item(ns_menu, layout.quit_idx, &quit);
