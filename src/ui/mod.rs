@@ -1,4 +1,4 @@
-use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{Menu, MenuId, MenuItem};
 use crate::provider::{LimitWindow, ProviderKind, UsageState};
 
 pub mod base;
@@ -19,6 +19,8 @@ pub(crate) struct MenuLayout {
     pub header_indices: Vec<(usize, ProviderKind)>,
     pub window_items: Vec<(usize, LimitWindow)>,
     pub refresh_idx: usize,
+    #[allow(dead_code)]
+    pub about_idx: usize,
     pub quit_idx: usize,
     pub last_updated: Option<String>,
 }
@@ -29,7 +31,7 @@ pub(crate) fn build_layout(
     states: &[(ProviderKind, &UsageState)],
     last_updated: Option<&str>,
 ) -> MenuLayout {
-    let mut idx: usize = 2; // About(0) + separator(1)
+    let mut idx: usize = 0;
     let mut header_indices: Vec<(usize, ProviderKind)> = Vec::new();
     let mut window_items: Vec<(usize, LimitWindow)> = Vec::new();
 
@@ -46,11 +48,13 @@ pub(crate) fn build_layout(
         };
     }
 
+    // Footer layout: Refresh, separator, About, Quit
     MenuLayout {
         header_indices,
         window_items,
         refresh_idx: idx,
-        quit_idx: idx + 1,
+        about_idx: idx + 2,
+        quit_idx: idx + 3,
         last_updated: last_updated.map(str::to_owned),
     }
 }
@@ -62,10 +66,6 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
 
 pub fn build_menu(states: &[(ProviderKind, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
     let menu = Menu::new();
-    let item_about = MenuItem::new("About AIUsageBar", true, None);
-    menu.append(&item_about).expect("menu append failed");
-    menu.append(&PredefinedMenuItem::separator())
-        .expect("menu append failed");
     for (kind, state) in states {
         match kind {
             ProviderKind::Claude => { let _ = claude::append_claude_section(&menu, state); }
@@ -83,7 +83,7 @@ pub fn build_menu(states: &[(ProviderKind, &UsageState)], last_updated: Option<&
 
     MenuBuild {
         menu,
-        about: item_about.id().clone(),
+        about: footer.about,
         refresh: footer.refresh,
         quit: footer.quit,
     }
@@ -96,9 +96,10 @@ mod tests {
 
     #[test]
     fn menu_layout_indices_no_providers() {
-        // About(0) + sep(1) → refresh at 2, quit at 3
+        // Refresh(0) + sep(1) + About(2) + Quit(3)
         let layout = build_layout(&[], None);
-        assert_eq!(layout.refresh_idx, 2);
+        assert_eq!(layout.refresh_idx, 0);
+        assert_eq!(layout.about_idx, 2);
         assert_eq!(layout.quit_idx, 3);
         assert!(layout.header_indices.is_empty());
     }
@@ -113,8 +114,9 @@ mod tests {
             Some("max".into()),
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None);
-        assert_eq!(layout.header_indices[0].0, 2);
-        assert_eq!(layout.refresh_idx, 5);
+        assert_eq!(layout.header_indices[0].0, 0);
+        assert_eq!(layout.refresh_idx, 3);
+        assert_eq!(layout.about_idx, 5);
         assert_eq!(layout.quit_idx, 6);
     }
 
@@ -129,8 +131,8 @@ mod tests {
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None);
         assert_eq!(layout.window_items.len(), 2);
-        assert_eq!(layout.window_items[0].0, 3);
-        assert_eq!(layout.window_items[1].0, 4);
+        assert_eq!(layout.window_items[0].0, 1);
+        assert_eq!(layout.window_items[1].0, 2);
         assert_eq!(layout.window_items[0].1.name, "5h session");
         assert_eq!(layout.window_items[1].1.name, "7d weekly");
     }
@@ -154,11 +156,13 @@ mod tests {
             None,
         );
         assert_eq!(layout.window_items.len(), 3);
-        assert_eq!(layout.window_items[0].0, 3);
-        assert_eq!(layout.window_items[1].0, 4);
-        assert_eq!(layout.window_items[2].0, 6);
+        assert_eq!(layout.window_items[0].0, 1);
+        assert_eq!(layout.window_items[1].0, 2);
+        assert_eq!(layout.window_items[2].0, 4);
         assert_eq!(layout.window_items[2].1.name, "monthly");
-        assert_eq!(layout.refresh_idx, 7);
+        assert_eq!(layout.refresh_idx, 5);
+        assert_eq!(layout.about_idx, 7);
+        assert_eq!(layout.quit_idx, 8);
     }
 
     #[test]
