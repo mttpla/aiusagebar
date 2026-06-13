@@ -193,7 +193,7 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
         origin: NSPoint { x: 8.0, y: 26.0 },
         size: NSSize { width: 155.0, height: 14.0 },
     });
-    container.addSubview(&*name_field);
+    container.addSubview(&name_field);
 
     // pct label — bold 11.5pt, threshold color (or secondary if unknown), right-aligned, top-right
     let pct_str = window
@@ -202,8 +202,8 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
         .unwrap_or_else(|| "—".to_string());
     let pct_field = NSTextField::labelWithString(&NSString::from_str(&pct_str), mtm);
     pct_field.setFont(Some(&NSFont::boldSystemFontOfSize(11.5)));
-    let pct_text_color: Retained<NSColor> = if window.percent_used.is_some() {
-        bar_fill_color(window.percent_used.unwrap())
+    let pct_text_color: Retained<NSColor> = if let Some(pct) = window.percent_used {
+        bar_fill_color(pct)
     } else {
         NSColor::secondaryLabelColor()
     };
@@ -213,7 +213,7 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
         origin: NSPoint { x: 163.0, y: 26.0 },
         size: NSSize { width: 119.0, height: 14.0 },
     });
-    container.addSubview(&*pct_field);
+    container.addSubview(&pct_field);
 
     // bar background — separatorColor
     let bar_bg: objc2::rc::Retained<NSBox> =
@@ -224,7 +224,7 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
     bar_bg.setBoxType(NSBoxType::Custom);
     bar_bg.setFillColor(&NSColor::separatorColor());
     bar_bg.setBorderWidth(0.0_f64);
-    container.addSubview(&*bar_bg);
+    container.addSubview(&bar_bg);
 
     // bar fill — threshold color
     let fill_w = bar_fill_width(window.percent_used);
@@ -237,7 +237,7 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
         bar_fill.setBoxType(NSBoxType::Custom);
         bar_fill.setFillColor(&bar_fill_color(window.percent_used.unwrap_or(0.0)));
         bar_fill.setBorderWidth(0.0_f64);
-        container.addSubview(&*bar_fill);
+        container.addSubview(&bar_fill);
     }
 
     // detail line — gray 10.5pt, bottom
@@ -250,7 +250,7 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
             origin: NSPoint { x: 8.0, y: 2.0 },
             size: NSSize { width: 270.0, height: 14.0 },
         });
-        container.addSubview(&*detail_field);
+        container.addSubview(&detail_field);
     }
 
     container
@@ -294,7 +294,7 @@ pub(super) fn style_menu(menu: &Menu, layout: &MenuLayout) {
         for (idx, window) in &layout.window_items {
             if let Some(item) = ns_menu.itemAtIndex(*idx as isize) {
                 let view = make_progress_row_view(window);
-                item.setView(Some(&*view));
+                item.setView(Some(&view));
             }
         }
     }
