@@ -172,6 +172,86 @@ fn format_reset(window: &crate::provider::LimitWindow) -> String {
     }
 }
 
+unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2::rc::Retained<NSView> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSBoxType;
+    let mtm = MainThreadMarker::new().expect("make_progress_row_view must be called on the main thread");
+
+    let container = NSView::initWithFrame(
+        mtm.alloc(),
+        NSRect {
+            origin: NSPoint { x: 0.0, y: 0.0 },
+            size: NSSize { width: 290.0, height: 42.0 },
+        },
+    );
+
+    // name label — gray 11.5pt, top-left
+    let name_field = NSTextField::labelWithString(&NSString::from_str(&window.name), mtm);
+    name_field.setFont(Some(&NSFont::systemFontOfSize(11.5)));
+    name_field.setTextColor(Some(&NSColor::secondaryLabelColor()));
+    name_field.setFrame(NSRect {
+        origin: NSPoint { x: 8.0, y: 26.0 },
+        size: NSSize { width: 155.0, height: 14.0 },
+    });
+    container.addSubview(&*name_field);
+
+    // pct label — bold 11.5pt, threshold color, right-aligned, top-right
+    let pct_str = window
+        .percent_used
+        .map(|p| format!("{:.1}%", p))
+        .unwrap_or_else(|| "—".to_string());
+    let pct_field = NSTextField::labelWithString(&NSString::from_str(&pct_str), mtm);
+    pct_field.setFont(Some(&NSFont::boldSystemFontOfSize(11.5)));
+    let threshold = bar_fill_color(window.percent_used.unwrap_or(0.0));
+    pct_field.setTextColor(Some(&threshold));
+    pct_field.setAlignment(NSTextAlignment::Right);
+    pct_field.setFrame(NSRect {
+        origin: NSPoint { x: 163.0, y: 26.0 },
+        size: NSSize { width: 119.0, height: 14.0 },
+    });
+    container.addSubview(&*pct_field);
+
+    // bar background — separatorColor
+    let bar_bg: objc2::rc::Retained<NSBox> =
+        objc2::msg_send![mtm.alloc::<NSBox>(), initWithFrame: NSRect {
+            origin: NSPoint { x: 8.0, y: 18.0 },
+            size: NSSize { width: 270.0, height: 4.0 },
+        }];
+    bar_bg.setBoxType(NSBoxType::Custom);
+    bar_bg.setFillColor(&NSColor::separatorColor());
+    bar_bg.setBorderWidth(0.0_f64);
+    container.addSubview(&*bar_bg);
+
+    // bar fill — threshold color
+    let fill_w = bar_fill_width(window.percent_used);
+    if fill_w > 0.0 {
+        let bar_fill: objc2::rc::Retained<NSBox> =
+            objc2::msg_send![mtm.alloc::<NSBox>(), initWithFrame: NSRect {
+                origin: NSPoint { x: 8.0, y: 18.0 },
+                size: NSSize { width: fill_w, height: 4.0 },
+            }];
+        bar_fill.setBoxType(NSBoxType::Custom);
+        bar_fill.setFillColor(&bar_fill_color(window.percent_used.unwrap_or(0.0)));
+        bar_fill.setBorderWidth(0.0_f64);
+        container.addSubview(&*bar_fill);
+    }
+
+    // detail line — gray 10.5pt, bottom
+    let detail = format_reset(window);
+    if !detail.is_empty() {
+        let detail_field = NSTextField::labelWithString(&NSString::from_str(&detail), mtm);
+        detail_field.setFont(Some(&NSFont::systemFontOfSize(10.5)));
+        detail_field.setTextColor(Some(&NSColor::secondaryLabelColor()));
+        detail_field.setFrame(NSRect {
+            origin: NSPoint { x: 8.0, y: 2.0 },
+            size: NSSize { width: 270.0, height: 14.0 },
+        });
+        container.addSubview(&*detail_field);
+    }
+
+    container
+}
+
 // ── Style pass ─────────────────────────────────────────────────────────────
 
 unsafe fn apply_to_item(ns_menu: &NSMenu, idx: usize, attr: &NSMutableAttributedString) {
@@ -206,6 +286,13 @@ pub(super) fn style_menu(menu: &Menu, layout: &MenuLayout) {
 
         let quit = quit_attr_str();
         apply_to_item(ns_menu, layout.quit_idx, &quit);
+
+        for (idx, window) in &layout.window_items {
+            if let Some(item) = ns_menu.itemAtIndex(*idx as isize) {
+                let view = make_progress_row_view(window);
+                item.setView(Some(&*view));
+            }
+        }
     }
 }
 
