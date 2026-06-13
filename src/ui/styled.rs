@@ -257,8 +257,12 @@ mod tests {
 
     #[test]
     fn format_reset_7d_window_returns_absolute_date() {
-        let w = make_window("7d weekly", None, Some("2026-06-20T08:00:00Z"));
-        assert_eq!(format_reset(&w), "resets Jun 20");
+        use chrono::DateTime;
+        let ts = "2026-06-20T08:00:00Z";
+        let dt = DateTime::parse_from_rfc3339(ts).unwrap();
+        let expected = format!("resets {}", dt.with_timezone(&chrono::Local).format("%b %-d"));
+        let w = make_window("7d weekly", None, Some(ts));
+        assert_eq!(format_reset(&w), expected);
     }
 
     #[test]
