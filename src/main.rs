@@ -14,7 +14,7 @@ use icon::{IconKind, Icons};
 use settings::Settings;
 use provider::claude::ClaudeProvider;
 use provider::copilot::CopilotProvider;
-use provider::{UsageProvider, UsageState};
+use provider::{ProviderKind, UsageProvider, UsageState};
 use tray_icon::{
     menu::MenuEvent,
     TrayIconBuilder, TrayIconEvent,
@@ -40,16 +40,16 @@ struct App {
 
 impl App {
     fn refresh(&mut self) {
-        let states: Vec<(&str, UsageState)> = self.providers
+        let states: Vec<(ProviderKind, UsageState)> = self.providers
             .iter()
-            .map(|p| (p.name(), p.fetch()))
+            .map(|p| (p.kind(), p.fetch()))
             .collect();
 
         let state_refs: Vec<&UsageState> = states.iter().map(|(_, s)| s).collect();
         let icon_kind = IconKind::for_providers(&state_refs, self.settings.alert_threshold_pct);
 
-        let refs: Vec<(&str, &UsageState)> =
-            states.iter().map(|(n, s)| (*n, s)).collect();
+        let refs: Vec<(ProviderKind, &UsageState)> =
+            states.iter().map(|(k, s)| (*k, s)).collect();
         let now = Local::now();
         let updated = now.format("%H:%M").to_string();
         let build = ui::build_menu(&refs, Some(&updated));
@@ -114,9 +114,9 @@ fn main() {
     let icons = Icons::load();
 
     let initial_state = UsageState::NotConfigured;
-    let initial_refs: Vec<(&str, &UsageState)> = providers
+    let initial_refs: Vec<(ProviderKind, &UsageState)> = providers
         .iter()
-        .map(|p| (p.name(), &initial_state))
+        .map(|p| (p.kind(), &initial_state))
         .collect();
     let build = ui::build_menu(&initial_refs, None);
 

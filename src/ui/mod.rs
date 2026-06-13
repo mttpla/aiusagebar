@@ -1,5 +1,5 @@
 use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
-use crate::provider::{LimitWindow, UsageState};
+use crate::provider::{LimitWindow, ProviderKind, UsageState};
 
 pub mod base;
 pub mod claude;
@@ -15,12 +15,6 @@ pub struct MenuBuild {
     pub quit: MenuId,
 }
 
-#[derive(Debug)]
-pub(crate) enum ProviderKind {
-    Claude,
-    Copilot,
-}
-
 pub(crate) struct MenuLayout {
     pub header_indices: Vec<(usize, ProviderKind)>,
     pub window_items: Vec<(usize, LimitWindow)>,
@@ -32,35 +26,24 @@ pub(crate) struct MenuLayout {
 /// Pure index-tracking function — does NOT build the actual Menu.
 /// Uses section_item_count from claude/copilot modules to count items per section.
 pub(crate) fn build_layout(
-    states: &[(&str, &UsageState)],
+    states: &[(ProviderKind, &UsageState)],
     last_updated: Option<&str>,
 ) -> MenuLayout {
     let mut idx: usize = 2; // About(0) + separator(1)
     let mut header_indices: Vec<(usize, ProviderKind)> = Vec::new();
     let mut window_items: Vec<(usize, LimitWindow)> = Vec::new();
 
-    for (name, state) in states {
-        match *name {
-            "Claude" => {
-                header_indices.push((idx, ProviderKind::Claude));
-                if let UsageState::Ok(windows, _) = state {
-                    for (i, w) in windows.iter().enumerate() {
-                        window_items.push((idx + 1 + i, w.clone()));
-                    }
-                }
-                idx += claude::section_item_count(state);
+    for (kind, state) in states {
+        header_indices.push((idx, *kind));
+        if let UsageState::Ok(windows, _) = state {
+            for (i, w) in windows.iter().enumerate() {
+                window_items.push((idx + 1 + i, w.clone()));
             }
-            "Copilot" => {
-                header_indices.push((idx, ProviderKind::Copilot));
-                if let UsageState::Ok(windows, _) = state {
-                    for (i, w) in windows.iter().enumerate() {
-                        window_items.push((idx + 1 + i, w.clone()));
-                    }
-                }
-                idx += copilot::section_item_count(state);
-            }
-            _ => idx += 1,
         }
+        idx += match kind {
+            ProviderKind::Claude => claude::section_item_count(state),
+            ProviderKind::Copilot => copilot::section_item_count(state),
+        };
     }
 
     MenuLayout {
@@ -77,17 +60,16 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
         .expect("menu append failed");
 }
 
-pub fn build_menu(states: &[(&str, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
+pub fn build_menu(states: &[(ProviderKind, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
     let menu = Menu::new();
     let item_about = MenuItem::new("About AIUsageBar", true, None);
     menu.append(&item_about).expect("menu append failed");
     menu.append(&PredefinedMenuItem::separator())
         .expect("menu append failed");
-    for (name, state) in states {
-        match *name {
-            "Claude" => { let _ = claude::append_claude_section(&menu, state); }
-            "Copilot" => { let _ = copilot::append_copilot_section(&menu, state); }
-            _ => append_label(&menu, format!("{}: unknown provider", name)),
+    for (kind, state) in states {
+        match kind {
+            ProviderKind::Claude => { let _ = claude::append_claude_section(&menu, state); }
+            ProviderKind::Copilot => { let _ = copilot::append_copilot_section(&menu, state); }
         }
     }
     let footer = base::append_footer(&menu);
@@ -123,7 +105,6 @@ mod tests {
 
     #[test]
     fn menu_layout_indices_claude_two_windows() {
-        // About(0) + sep(1) + header(2) + win1(3) + win2(4) → refresh at 5, quit at 6
         let state = UsageState::Ok(
             vec![
                 LimitWindow { name: "d".into(), ..Default::default() },
@@ -131,7 +112,7 @@ mod tests {
             ],
             Some("max".into()),
         );
-        let layout = build_layout(&[("Claude", &state)], None);
+        let layout = build_layout(&[(ProviderKind::Claude, &state)], None);
         assert_eq!(layout.header_indices[0].0, 2);
         assert_eq!(layout.refresh_idx, 5);
         assert_eq!(layout.quit_idx, 6);
@@ -139,7 +120,6 @@ mod tests {
 
     #[test]
     fn build_layout_claude_window_items_indices() {
-        // About(0) + sep(1) + header(2) + win0(3) + win1(4) → refresh=5
         let state = UsageState::Ok(
             vec![
                 LimitWindow { name: "5h session".into(), percent_used: Some(39.0), ..Default::default() },
@@ -147,9 +127,9 @@ mod tests {
             ],
             Some("max".into()),
         );
-        let layout = build_layout(&[("Claude", &state)], None);
+        let layout = build_layout(&[(ProviderKind::Claude, &state)], None);
         assert_eq!(layout.window_items.len(), 2);
-        assert_eq!(layout.window_items[0].0, 3); // first window at index 3
+        assert_eq!(layout.window_items[0].0, 3);
         assert_eq!(layout.window_items[1].0, 4);
         assert_eq!(layout.window_items[0].1.name, "5h session");
         assert_eq!(layout.window_items[1].1.name, "7d weekly");
@@ -169,8 +149,10 @@ mod tests {
             vec![LimitWindow { name: "monthly".into(), ..Default::default() }],
             None,
         );
-        let layout = build_layout(&[("Claude", &claude_state), ("Copilot", &copilot_state)], None);
-        // Claude windows at 3, 4; Copilot window at 6
+        let layout = build_layout(
+            &[(ProviderKind::Claude, &claude_state), (ProviderKind::Copilot, &copilot_state)],
+            None,
+        );
         assert_eq!(layout.window_items.len(), 3);
         assert_eq!(layout.window_items[0].0, 3);
         assert_eq!(layout.window_items[1].0, 4);
@@ -181,7 +163,7 @@ mod tests {
 
     #[test]
     fn build_layout_non_ok_state_no_window_items() {
-        let layout = build_layout(&[("Claude", &UsageState::NotConfigured)], None);
+        let layout = build_layout(&[(ProviderKind::Claude, &UsageState::NotConfigured)], None);
         assert!(layout.window_items.is_empty());
     }
 }

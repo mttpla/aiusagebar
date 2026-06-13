@@ -1,5 +1,5 @@
 use tray_icon::menu::Menu;
-use crate::provider::UsageState;
+use crate::provider::{ProviderKind, UsageState};
 
 pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
     match state {
@@ -26,7 +26,7 @@ pub(crate) fn section_item_count(state: &UsageState) -> usize {
 }
 
 pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> usize {
-    super::append_label(menu, header_label("Claude", state));
+    super::append_label(menu, header_label(ProviderKind::Claude.display_name(), state));
     let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
         for w in windows {

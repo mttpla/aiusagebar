@@ -123,8 +123,8 @@ impl CopilotProvider {
 }
 
 impl crate::provider::UsageProvider for CopilotProvider {
-    fn name(&self) -> &'static str {
-        "GitHub"
+    fn kind(&self) -> crate::provider::ProviderKind {
+        crate::provider::ProviderKind::Copilot
     }
 
     fn fetch(&self) -> UsageState {

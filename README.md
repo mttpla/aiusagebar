@@ -12,7 +12,7 @@ Read-only monitor. Never sends prompts, never spends quota, never modifies crede
 |------------|----------------------------------------|
 | OpenAI     | 5h session · 7d weekly                 |
 | Anthropic  | 5h session · 7d weekly                 |
-| GitHub     | Monthly premium quota (per account)    |
+| Copilot    | Monthly premium quota (per account)    |
 
 Per-provider states: **Not configured** · **Stale** (renew via official client) · **OK** · **Error**.
 
