@@ -195,15 +195,19 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
     });
     container.addSubview(&*name_field);
 
-    // pct label — bold 11.5pt, threshold color, right-aligned, top-right
+    // pct label — bold 11.5pt, threshold color (or secondary if unknown), right-aligned, top-right
     let pct_str = window
         .percent_used
         .map(|p| format!("{:.1}%", p))
         .unwrap_or_else(|| "—".to_string());
     let pct_field = NSTextField::labelWithString(&NSString::from_str(&pct_str), mtm);
     pct_field.setFont(Some(&NSFont::boldSystemFontOfSize(11.5)));
-    let threshold = bar_fill_color(window.percent_used.unwrap_or(0.0));
-    pct_field.setTextColor(Some(&threshold));
+    let pct_text_color: Retained<NSColor> = if window.percent_used.is_some() {
+        bar_fill_color(window.percent_used.unwrap())
+    } else {
+        NSColor::secondaryLabelColor()
+    };
+    pct_field.setTextColor(Some(&pct_text_color));
     pct_field.setAlignment(NSTextAlignment::Right);
     pct_field.setFrame(NSRect {
         origin: NSPoint { x: 163.0, y: 26.0 },
