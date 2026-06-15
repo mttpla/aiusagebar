@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.3.0] - 2026-06-15
+
+### Bug Fixes
+
+- Per-account error rows and clean header for Copilot multi-account
+- Strip v-prefix from git describe so about shows clean version
+- Pin menu width to 290px, derive bar dimensions from constants
+
+### Documentation
+
+- Card #36 release.sh hardening + split GH Action out of #11
+- Card #37 GH Action on tag + cliff.toml v-prefix fix into #36
+- Close card #31 and commit plan file
+- Add cards #38 and #39 with spec and plan
+
+### Features
+
+- Render reset time in local OS timezone
+
+### Miscellaneous
+
+- Archive #14 — premise superseded by live Copilot provider
+- Split #11 into ad-hoc DMG (pre-1.0) + #35 notarized DMG (post-1.0)
+
+### Refactoring
+
+- Hoist Local::now() out of window loop
+- Centralize reset-time TZ conversion in ui/time.rs
+
 ## [0.2.0] - 2026-06-13
 
 ### Bug Fixes
