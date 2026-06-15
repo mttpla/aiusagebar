@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 use std::time::Duration;
+use ureq::tls::{TlsConfig, TlsProvider};
 
 #[derive(Debug, PartialEq)]
 pub enum HttpError {
@@ -14,6 +15,7 @@ fn agent() -> &'static ureq::Agent {
         ureq::Agent::config_builder()
             .timeout_global(Some(Duration::from_secs(15)))
             .http_status_as_error(false)
+            .tls_config(TlsConfig::builder().provider(TlsProvider::NativeTls).build())
             .build()
             .new_agent()
     })
