@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use tray_icon::menu::Menu;
 use crate::provider::{LimitWindow, ProviderKind, UsageState};
 
@@ -11,12 +12,16 @@ pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
     }
 }
 
-pub(crate) fn row_label(window: &LimitWindow) -> String {
+pub(crate) fn row_label(window: &LimitWindow, now: DateTime<Local>) -> String {
     let pct = window
         .percent_used
         .map(|p| format!("{:.1}%", p))
         .unwrap_or_else(|| "—".to_string());
-    let reset = window.resets_at.as_deref().unwrap_or("?");
+    let reset = window
+        .resets_at
+        .as_deref()
+        .map(|s| super::time::format_reset_local(s, now))
+        .unwrap_or_else(|| "?".to_string());
     format!("  {} — {}  resets {}", window.name, pct, reset)
 }
 
@@ -33,8 +38,9 @@ pub(crate) fn append_copilot_section(menu: &Menu, state: &UsageState) -> usize {
     super::append_label(menu, header_label(ProviderKind::Copilot.display_name(), state));
     let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
+        let now = Local::now();
         for w in windows {
-            super::append_label(menu, row_label(w));
+            super::append_label(menu, row_label(w, now));
             count += 1;
         }
     }
@@ -57,16 +63,49 @@ mod tests {
         }
     }
 
+    fn now_from_utc(rfc3339: &str) -> DateTime<Local> {
+        DateTime::parse_from_rfc3339(rfc3339)
+            .unwrap()
+            .with_timezone(&Local)
+    }
+
     #[test]
-    fn row_with_pct_and_reset() {
-        let w = make_window("Daily", Some(42.5), Some("2026-06-13 00:00"));
-        assert_eq!(row_label(&w), "  Daily — 42.5%  resets 2026-06-13 00:00");
+    fn row_same_day_reset_shows_hhmm() {
+        let now = now_from_utc("2026-06-13T10:00:00Z");
+        let w = make_window("Daily", Some(42.5), Some("2026-06-13T12:30:00Z"));
+        let label = row_label(&w, now);
+        assert!(label.starts_with("  Daily — 42.5%  resets "), "got: {label}");
+        let reset_part = label.trim_start_matches("  Daily — 42.5%  resets ");
+        assert!(
+            chrono::NaiveTime::parse_from_str(reset_part, "%H:%M").is_ok(),
+            "expected HH:MM, got '{reset_part}'"
+        );
+    }
+
+    #[test]
+    fn row_different_day_reset_shows_datetime() {
+        let now = now_from_utc("2026-05-14T10:00:00Z");
+        let w = make_window("Daily", Some(42.5), Some("2026-06-13T12:30:00Z"));
+        let label = row_label(&w, now);
+        let reset_part = label.trim_start_matches("  Daily — 42.5%  resets ");
+        assert!(
+            chrono::NaiveDateTime::parse_from_str(reset_part, "%Y-%m-%d %H:%M").is_ok(),
+            "expected YYYY-MM-DD HH:MM, got '{reset_part}'"
+        );
+    }
+
+    #[test]
+    fn row_malformed_resets_at_passthrough() {
+        let now = now_from_utc("2026-06-13T10:00:00Z");
+        let w = make_window("Daily", Some(42.5), Some("not-a-date"));
+        assert_eq!(row_label(&w, now), "  Daily — 42.5%  resets not-a-date");
     }
 
     #[test]
     fn row_no_pct_no_reset() {
+        let now = now_from_utc("2026-06-13T10:00:00Z");
         let w = make_window("Daily", None, None);
-        assert_eq!(row_label(&w), "  Daily — —  resets ?");
+        assert_eq!(row_label(&w, now), "  Daily — —  resets ?");
     }
 
     #[test]

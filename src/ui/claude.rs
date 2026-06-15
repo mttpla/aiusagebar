@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local};
+use chrono::Local;
 use tray_icon::menu::Menu;
 use crate::provider::{ProviderKind, UsageState};
 
@@ -15,20 +15,6 @@ pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
 pub(crate) fn pct_label(pct: Option<f32>) -> String {
     pct.map(|p| format!("{:.1}%", p))
         .unwrap_or_else(|| "—".to_string())
-}
-
-fn format_reset_local(iso_utc: &str, now: DateTime<Local>) -> String {
-    match DateTime::parse_from_rfc3339(iso_utc) {
-        Ok(dt) => {
-            let local = dt.with_timezone(&Local);
-            if local.date_naive() == now.date_naive() {
-                local.format("%H:%M").to_string()
-            } else {
-                local.format("%Y-%m-%d %H:%M").to_string()
-            }
-        }
-        Err(_) => iso_utc.to_string(),
-    }
 }
 
 /// Returns the number of NSMenu items that `append_claude_section` will append:
@@ -49,7 +35,7 @@ pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> usize {
             let reset = w
                 .resets_at
                 .as_deref()
-                .map(|s| format_reset_local(s, now))
+                .map(|s| super::time::format_reset_local(s, now))
                 .unwrap_or_else(|| "?".to_string());
             super::append_label(
                 menu,
@@ -131,54 +117,4 @@ mod tests {
         assert_eq!(section_item_count(&UsageState::NotConfigured), 1);
     }
 
-    // ---- format_reset_local ----
-
-    fn now_local_from_utc(rfc3339: &str) -> chrono::DateTime<chrono::Local> {
-        chrono::DateTime::parse_from_rfc3339(rfc3339)
-            .unwrap()
-            .with_timezone(&chrono::Local)
-    }
-
-    #[test]
-    fn reset_same_day_returns_hhmm() {
-        // now == input instant → guaranteed same local date
-        let now = now_local_from_utc("2026-06-13T12:30:00Z");
-        let result = format_reset_local("2026-06-13T12:30:00Z", now);
-        // shape: HH:MM (exactly 5 chars, no date part)
-        assert!(
-            chrono::NaiveTime::parse_from_str(&result, "%H:%M").is_ok(),
-            "expected HH:MM, got '{}'",
-            result
-        );
-    }
-
-    #[test]
-    fn reset_different_day_returns_datetime() {
-        // now is 30 days before input → guaranteed different local date
-        let now = now_local_from_utc("2026-05-14T12:30:00Z");
-        let result = format_reset_local("2026-06-13T12:30:00Z", now);
-        // shape: YYYY-MM-DD HH:MM (exactly 16 chars)
-        assert!(
-            chrono::NaiveDateTime::parse_from_str(&result, "%Y-%m-%d %H:%M").is_ok(),
-            "expected YYYY-MM-DD HH:MM, got '{}'",
-            result
-        );
-    }
-
-    #[test]
-    fn reset_midnight_cross_valid_shape() {
-        // UTC 23:30 on June 13 → local date/time is TZ-dependent
-        // assert output is one of the two valid formats (TZ-agnostic)
-        let now = now_local_from_utc("2026-06-13T10:00:00Z");
-        let result = format_reset_local("2026-06-13T23:30:00Z", now);
-        let valid = chrono::NaiveTime::parse_from_str(&result, "%H:%M").is_ok()
-            || chrono::NaiveDateTime::parse_from_str(&result, "%Y-%m-%d %H:%M").is_ok();
-        assert!(valid, "unexpected format: '{}'", result);
-    }
-
-    #[test]
-    fn reset_malformed_passthrough() {
-        let now = now_local_from_utc("2026-06-13T10:00:00Z");
-        assert_eq!(format_reset_local("not-a-date", now), "not-a-date");
-    }
 }

@@ -4,6 +4,7 @@ use crate::provider::{LimitWindow, ProviderKind, UsageState};
 pub mod base;
 pub mod claude;
 pub mod copilot;
+pub(crate) mod time;
 
 #[cfg(target_os = "macos")]
 pub(crate) mod styled;

@@ -108,3 +108,7 @@ No new runtime crates. Possibly no new dev-dependencies either.
 ## Rollout
 
 Single PR. No migration. Behavior change is cosmetic in the Copilot section of the tray menu. If card #31 is in flight on the same branch, coordinate to land them in series to avoid a merge conflict in `src/ui/mod.rs`.
+
+## Status quo (2026-06-15)
+
+Card #31 landed with `format_reset_local` inlined as a private `fn` in `src/ui/claude.rs:20`. No `src/ui/time.rs` existed. **Branch 2 applied:** extracted helper to `src/ui/time.rs`, switched `claude.rs` to call it, added call site in `copilot.rs`. Implementation complete.
