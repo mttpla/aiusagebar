@@ -8,26 +8,30 @@ pub enum HttpError {
     Other(String),
 }
 
-pub fn client() -> &'static reqwest::blocking::Client {
-    static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(15))
+fn agent() -> &'static ureq::Agent {
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+    AGENT.get_or_init(|| {
+        ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(15)))
+            .http_status_as_error(false)
             .build()
-            .expect("failed to build HTTP client")
+            .new_agent()
     })
 }
 
 pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<String, HttpError> {
-    let mut builder = client()
+    let mut req = agent()
         .get(url)
-        .header("Authorization", format!("Bearer {}", token));
+        .header("Authorization", &format!("Bearer {}", token));
     for (name, value) in extra_headers {
-        builder = builder.header(*name, *value);
+        req = req.header(*name, *value);
     }
-    let resp = builder.send().map_err(|e| HttpError::Other(e.to_string()))?;
+    let resp = req.call().map_err(|e| HttpError::Other(e.to_string()))?;
     match resp.status().as_u16() {
-        200 => resp.text().map_err(|e| HttpError::Other(e.to_string())),
+        200 => resp
+            .into_body()
+            .read_to_string()
+            .map_err(|e| HttpError::Other(e.to_string())),
         401 => Err(HttpError::Unauthorized),
         429 => Err(HttpError::RateLimited),
         code => Err(HttpError::Other(format!("HTTP {}", code))),
@@ -37,9 +41,9 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<Str
 #[cfg(test)]
 mod tests {
     #[test]
-    fn shared_client_is_reused() {
-        let a = super::client() as *const reqwest::blocking::Client;
-        let b = super::client() as *const reqwest::blocking::Client;
-        assert_eq!(a, b, "client() must return the same instance across calls");
+    fn shared_agent_is_reused() {
+        let a = super::agent() as *const ureq::Agent;
+        let b = super::agent() as *const ureq::Agent;
+        assert_eq!(a, b, "agent() must return the same instance across calls");
     }
 }
