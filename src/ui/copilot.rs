@@ -5,7 +5,7 @@ use crate::provider::{LimitWindow, ProviderKind, UsageState};
 pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
     match state {
         UsageState::Ok(_, Some(p)) => format!("{} — {}", name, p),
-        UsageState::Ok(_, None) => format!("{} — account unavailable", name),
+        UsageState::Ok(_, None) => name.to_string(),
         UsageState::Stale(msg) => format!("{} ⚠  {}", name, msg),
         UsageState::Error(msg) => format!("{} ✕  {}", name, msg),
         UsageState::NotConfigured => format!("{}: not configured", name),
@@ -122,5 +122,11 @@ mod tests {
     fn append_copilot_section_count_not_configured() {
         use crate::provider::UsageState;
         assert_eq!(section_item_count(&UsageState::NotConfigured), 1);
+    }
+
+    #[test]
+    fn header_ok_no_profile_shows_name_only() {
+        let state = UsageState::Ok(vec![], None);
+        assert_eq!(header_label("GitHub Copilot", &state), "GitHub Copilot");
     }
 }

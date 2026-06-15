@@ -47,7 +47,7 @@ fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
 }
 
 pub fn do_copilot_fetch(
-    tokens: Vec<String>,
+    tokens: Vec<(String, String)>,
     http: &dyn Fn(&str) -> Result<String, HttpError>,
 ) -> UsageState {
     if tokens.is_empty() {
@@ -55,25 +55,25 @@ pub fn do_copilot_fetch(
     }
 
     let mut ok_windows: Vec<LimitWindow> = Vec::new();
-    let mut stale_count: usize = 0;
+    let mut stale_accounts: Vec<String> = Vec::new();
     let mut error_msgs: Vec<String> = Vec::new();
 
-    for token in &tokens {
+    for (account, token) in &tokens {
         match http(token) {
             Ok(body) => match parse_copilot_response(&body) {
                 Ok(windows) => ok_windows.extend(windows),
-                Err(e) => error_msgs.push(e),
+                Err(e) => error_msgs.push(format!("@{} — {}", account, e)),
             },
-            Err(HttpError::Unauthorized) => stale_count += 1,
-            Err(HttpError::RateLimited) => error_msgs.push("rate limited".to_string()),
-            Err(HttpError::Other(e)) => error_msgs.push(e),
+            Err(HttpError::Unauthorized) => stale_accounts.push(account.clone()),
+            Err(HttpError::RateLimited) => error_msgs.push(format!("@{} — rate limited", account)),
+            Err(HttpError::Other(e)) => error_msgs.push(format!("@{} — {}", account, e)),
         }
     }
 
     if !ok_windows.is_empty() {
-        for _ in 0..stale_count {
+        for account in stale_accounts {
             ok_windows.push(LimitWindow {
-                name: "GitHub — token expired, re-login".to_string(),
+                name: format!("@{} — token expired, re-login", account),
                 percent_used: None,
                 limit: None,
                 remaining: None,
@@ -83,7 +83,7 @@ pub fn do_copilot_fetch(
         }
         for msg in error_msgs {
             ok_windows.push(LimitWindow {
-                name: format!("GitHub — {}", msg),
+                name: msg,
                 percent_used: None,
                 limit: None,
                 remaining: None,
@@ -94,7 +94,7 @@ pub fn do_copilot_fetch(
         return UsageState::Ok(ok_windows, None);
     }
 
-    if stale_count > 0 {
+    if !stale_accounts.is_empty() {
         return UsageState::Stale(
             "Copilot tokens expired — run: copilot auth login".to_string(),
         );
@@ -103,12 +103,12 @@ pub fn do_copilot_fetch(
     UsageState::Error(error_msgs.join("; "))
 }
 
-fn load_copilot_tokens() -> Vec<String> {
+fn load_copilot_tokens() -> Vec<(String, String)> {
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut tokens: Vec<String> = Vec::new();
-    for (_account, password) in crate::keychain::enumerate_generic_passwords("copilot-cli") {
+    let mut tokens: Vec<(String, String)> = Vec::new();
+    for (account, password) in crate::keychain::enumerate_generic_passwords("copilot-cli") {
         if seen.insert(password.clone()) {
-            tokens.push(password);
+            tokens.push((account, password));
         }
     }
     tokens
@@ -227,6 +227,10 @@ mod tests {
         r#"{"login":"mttpla","quota_reset_date_utc":"2026-07-01T00:00:00Z","quota_snapshots":{"premium_interactions":{"entitlement":7000,"remaining":6604,"percent_remaining":94.3,"unlimited":false}}}"#.to_string()
     }
 
+    fn tok(account: &str, token: &str) -> (String, String) {
+        (account.to_string(), token.to_string())
+    }
+
     #[test]
     fn fetch_empty_tokens_returns_not_configured() {
         let state = do_copilot_fetch(vec![], &|_| unreachable!());
@@ -236,7 +240,7 @@ mod tests {
     #[test]
     fn fetch_all_401_returns_stale() {
         let state = do_copilot_fetch(
-            vec!["tok".to_string()],
+            vec![tok("alice", "tok")],
             &|_| Err(HttpError::Unauthorized),
         );
         assert!(matches!(state, UsageState::Stale(_)));
@@ -245,7 +249,7 @@ mod tests {
     #[test]
     fn fetch_200_valid_returns_ok_with_windows() {
         let state = do_copilot_fetch(
-            vec!["tok".to_string()],
+            vec![tok("alice", "tok")],
             &|_| Ok(valid_body()),
         );
         assert!(matches!(state, UsageState::Ok(ref w, _) if !w.is_empty()));
@@ -253,31 +257,44 @@ mod tests {
 
     #[test]
     fn fetch_mixed_success_and_401_returns_ok_with_sentinel() {
-        let tokens = vec!["good".to_string(), "bad".to_string()];
+        let tokens = vec![tok("good_account", "good"), tok("bad_account", "bad")];
         let state = do_copilot_fetch(tokens, &|tok| {
             if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Unauthorized) }
         });
         let UsageState::Ok(windows, _) = state else { panic!("expected Ok") };
         assert!(windows.iter().any(|w| w.percent_used.is_some()), "real window missing");
         assert!(
-            windows.iter().any(|w| w.percent_used.is_none() && w.name.contains("expired")),
-            "sentinel window missing"
+            windows.iter().any(|w| w.percent_used.is_none() && w.name.contains("@bad_account") && w.name.contains("expired")),
+            "sentinel window missing or missing account name"
         );
     }
 
     #[test]
     fn fetch_other_error_returns_error() {
         let state = do_copilot_fetch(
-            vec!["tok".to_string()],
+            vec![tok("alice", "tok")],
             &|_| Err(HttpError::Other("connection refused".to_string())),
         );
         assert!(matches!(state, UsageState::Error(ref s) if s.contains("connection refused")));
     }
 
     #[test]
+    fn fetch_error_sentinel_contains_account_name() {
+        let tokens = vec![tok("good_account", "good"), tok("bad_account", "bad")];
+        let state = do_copilot_fetch(tokens, &|tok| {
+            if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Other("timeout".to_string())) }
+        });
+        let UsageState::Ok(windows, _) = state else { panic!("expected Ok") };
+        assert!(
+            windows.iter().any(|w| w.name.contains("@bad_account") && w.name.contains("timeout")),
+            "error sentinel missing account name"
+        );
+    }
+
+    #[test]
     fn fetch_200_bad_body_returns_error() {
         let state = do_copilot_fetch(
-            vec!["tok".to_string()],
+            vec![tok("alice", "tok")],
             &|_| Ok("not json".to_string()),
         );
         assert!(matches!(state, UsageState::Error(_)));
