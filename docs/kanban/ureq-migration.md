@@ -4,6 +4,7 @@ status: backlog
 priority: Medium
 tags: [performance, dependencies, memory]
 spec: specs/2026-06-16-ureq-migration-design.md
+plan: plans/2026-06-16-ureq-migration.md
 created: 2026-06-16
 updated: 2026-06-16
 ---
