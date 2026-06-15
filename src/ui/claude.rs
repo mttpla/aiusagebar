@@ -44,11 +44,12 @@ pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> usize {
     super::append_label(menu, header_label(ProviderKind::Claude.display_name(), state));
     let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
+        let now = Local::now();
         for w in windows {
             let reset = w
                 .resets_at
                 .as_deref()
-                .map(|s| format_reset_local(s, Local::now()))
+                .map(|s| format_reset_local(s, now))
                 .unwrap_or_else(|| "?".to_string());
             super::append_label(
                 menu,
