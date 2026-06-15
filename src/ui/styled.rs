@@ -5,14 +5,16 @@ use objc2::runtime::AnyObject;
 use objc2::AnyThread;
 use objc2_app_kit::{
     NSBox, NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSMenu,
-    NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextAlignment, NSTextField,
-    NSTextTab, NSView,
+    NSTextAlignment, NSTextField, NSView,
 };
-use objc2_foundation::{NSArray, NSDictionary, NSMutableAttributedString, NSPoint, NSRange, NSRect, NSSize, NSString};
+use objc2_foundation::{NSMutableAttributedString, NSPoint, NSRange, NSRect, NSSize, NSString};
 use tray_icon::menu::{ContextMenu, Menu};
 
 use super::MenuLayout;
 use crate::provider::ProviderKind;
+
+const CONTAINER_W: f64 = 290.0;
+const BAR_MARGIN: f64 = 8.0;
 
 // ── Color ──────────────────────────────────────────────────────────────────
 
@@ -30,32 +32,6 @@ unsafe fn set_color(mattr: &NSMutableAttributedString, color: &NSColor, range: N
 unsafe fn set_font(mattr: &NSMutableAttributedString, font: &NSFont, range: NSRange) {
     let value: &AnyObject = &*(font as *const NSFont as *const AnyObject);
     mattr.addAttribute_value_range(NSFontAttributeName, value, range);
-}
-
-unsafe fn set_para_style(mattr: &NSMutableAttributedString, style: &NSMutableParagraphStyle) {
-    let len = mattr.length();
-    let range = NSRange { location: 0, length: len };
-    let value: &AnyObject = &*(style as *const NSMutableParagraphStyle as *const AnyObject);
-    mattr.addAttribute_value_range(NSParagraphStyleAttributeName, value, range);
-}
-
-// ── Paragraph style: right tab stop at 290pt ───────────────────────────────
-
-fn refresh_para_style() -> Retained<NSMutableParagraphStyle> {
-    let para = NSMutableParagraphStyle::new();
-    let options: Retained<NSDictionary<NSString, AnyObject>> = NSDictionary::new();
-    let tab = unsafe {
-        NSTextTab::initWithTextAlignment_location_options(
-            NSTextTab::alloc(),
-            NSTextAlignment::Right,
-            290.0,
-            &options,
-        )
-    };
-    let tabs: Retained<NSArray<NSTextTab>> = NSArray::from_retained_slice(&[tab]);
-    para.setTabStops(Some(&tabs));
-    para.setDefaultTabInterval(0.0);
-    para
 }
 
 // ── Attributed string builders ─────────────────────────────────────────────
@@ -99,45 +75,6 @@ fn quit_attr_str() -> Retained<NSMutableAttributedString> {
     mattr
 }
 
-/// Refresh item: "↺ Refresh" in blue 13pt; if `updated` is Some, appends tab +
-/// "Updated HH:MM" in secondaryLabelColor 11pt at right tab stop 290pt.
-fn refresh_attr_str(updated: Option<&str>) -> Retained<NSMutableAttributedString> {
-    let refresh_text = "↺ Refresh";
-    let full_text = match updated {
-        Some(ts) => format!("↺ Refresh\tUpdated {}", ts),
-        None => refresh_text.to_owned(),
-    };
-    let ns_text = NSString::from_str(&full_text);
-    let mattr =
-        NSMutableAttributedString::initWithString(NSMutableAttributedString::alloc(), &ns_text);
-
-    if updated.is_some() {
-        let para = refresh_para_style();
-        unsafe {
-            set_para_style(&mattr, &para);
-        }
-    }
-
-    let refresh_len = NSString::from_str(refresh_text).length();
-    let refresh_range = NSRange { location: 0, length: refresh_len };
-    unsafe {
-        set_color(&mattr, &srgb(0.078, 0.494, 0.984), refresh_range);
-        set_font(&mattr, &NSFont::systemFontOfSize(13.0), refresh_range);
-    }
-
-    if let Some(ts) = updated {
-        let tab_text = format!("\tUpdated {}", ts);
-        let tab_len = NSString::from_str(&tab_text).length();
-        let ts_range = NSRange { location: refresh_len, length: tab_len };
-        unsafe {
-            set_color(&mattr, &NSColor::secondaryLabelColor(), ts_range);
-            set_font(&mattr, &NSFont::systemFontOfSize(11.0), ts_range);
-        }
-    }
-
-    mattr
-}
-
 // ── Progress bar helpers ───────────────────────────────────────────────────
 
 fn bar_fill_color(pct: f32) -> Retained<NSColor> {
@@ -150,10 +87,10 @@ fn bar_fill_color(pct: f32) -> Retained<NSColor> {
     }
 }
 
-fn bar_fill_width(pct: Option<f32>) -> f64 {
-    pct.map(|p| (p / 100.0 * 270.0) as f64)
+fn bar_fill_width(pct: Option<f32>, bar_w: f64) -> f64 {
+    pct.map(|p| (p / 100.0) as f64 * bar_w)
         .unwrap_or(0.0)
-        .clamp(0.0, 270.0)
+        .clamp(0.0, bar_w)
 }
 
 fn format_reset(window: &crate::provider::LimitWindow) -> String {
@@ -191,16 +128,64 @@ fn format_reset(window: &crate::provider::LimitWindow) -> String {
     }
 }
 
-unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2::rc::Retained<NSView> {
+unsafe fn make_refresh_row_view(updated: Option<&str>) -> Retained<NSView> {
     use objc2::MainThreadMarker;
-    use objc2_app_kit::NSBoxType;
-    let mtm = MainThreadMarker::new().expect("make_progress_row_view must be called on the main thread");
+    let mtm = MainThreadMarker::new().expect("make_refresh_row_view must be called on the main thread");
+
+    const ROW_H: f64 = 22.0;
+    const LABEL_H: f64 = 16.0;
+    const LABEL_Y: f64 = 3.0;
+    const REFRESH_W: f64 = 120.0;
 
     let container = NSView::initWithFrame(
         mtm.alloc(),
         NSRect {
             origin: NSPoint { x: 0.0, y: 0.0 },
-            size: NSSize { width: 290.0, height: 42.0 },
+            size: NSSize { width: CONTAINER_W, height: ROW_H },
+        },
+    );
+
+    let refresh_field = NSTextField::labelWithString(&NSString::from_str("↺ Refresh"), mtm);
+    refresh_field.setFont(Some(&NSFont::systemFontOfSize(13.0)));
+    refresh_field.setTextColor(Some(&srgb(0.078, 0.494, 0.984)));
+    refresh_field.setFrame(NSRect {
+        origin: NSPoint { x: BAR_MARGIN, y: LABEL_Y },
+        size: NSSize { width: REFRESH_W, height: LABEL_H },
+    });
+    container.addSubview(&refresh_field);
+
+    if let Some(ts) = updated {
+        let text = format!("Updated {}", ts);
+        let updated_field = NSTextField::labelWithString(&NSString::from_str(&text), mtm);
+        updated_field.setFont(Some(&NSFont::systemFontOfSize(11.0)));
+        updated_field.setTextColor(Some(&NSColor::secondaryLabelColor()));
+        updated_field.setAlignment(NSTextAlignment::Right);
+        let upd_x = BAR_MARGIN + REFRESH_W;
+        updated_field.setFrame(NSRect {
+            origin: NSPoint { x: upd_x, y: LABEL_Y },
+            size: NSSize { width: CONTAINER_W - upd_x, height: LABEL_H },
+        });
+        container.addSubview(&updated_field);
+    }
+
+    container
+}
+
+unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2::rc::Retained<NSView> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSBoxType;
+    let mtm = MainThreadMarker::new().expect("make_progress_row_view must be called on the main thread");
+
+    let bar_w = CONTAINER_W - 2.0 * BAR_MARGIN;
+    let name_w: f64 = 155.0;
+    let pct_x = BAR_MARGIN + name_w;
+    let pct_w = CONTAINER_W - pct_x;
+
+    let container = NSView::initWithFrame(
+        mtm.alloc(),
+        NSRect {
+            origin: NSPoint { x: 0.0, y: 0.0 },
+            size: NSSize { width: CONTAINER_W, height: 42.0 },
         },
     );
 
@@ -209,8 +194,8 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
     name_field.setFont(Some(&NSFont::systemFontOfSize(11.5)));
     name_field.setTextColor(Some(&NSColor::secondaryLabelColor()));
     name_field.setFrame(NSRect {
-        origin: NSPoint { x: 8.0, y: 26.0 },
-        size: NSSize { width: 155.0, height: 14.0 },
+        origin: NSPoint { x: BAR_MARGIN, y: 26.0 },
+        size: NSSize { width: name_w, height: 14.0 },
     });
     container.addSubview(&name_field);
 
@@ -228,18 +213,17 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
     };
     pct_field.setTextColor(Some(&pct_text_color));
     pct_field.setAlignment(NSTextAlignment::Right);
-    // Right edge at x=290 to match the Refresh row tab stop (refresh_para_style → 290pt).
     pct_field.setFrame(NSRect {
-        origin: NSPoint { x: 163.0, y: 26.0 },
-        size: NSSize { width: 127.0, height: 14.0 },
+        origin: NSPoint { x: pct_x, y: 26.0 },
+        size: NSSize { width: pct_w, height: 14.0 },
     });
     container.addSubview(&pct_field);
 
     // bar background — separatorColor
     let bar_bg: objc2::rc::Retained<NSBox> =
         objc2::msg_send![mtm.alloc::<NSBox>(), initWithFrame: NSRect {
-            origin: NSPoint { x: 8.0, y: 18.0 },
-            size: NSSize { width: 270.0, height: 4.0 },
+            origin: NSPoint { x: BAR_MARGIN, y: 18.0 },
+            size: NSSize { width: bar_w, height: 4.0 },
         }];
     bar_bg.setBoxType(NSBoxType::Custom);
     bar_bg.setFillColor(&NSColor::separatorColor());
@@ -247,11 +231,11 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
     container.addSubview(&bar_bg);
 
     // bar fill — threshold color
-    let fill_w = bar_fill_width(window.percent_used);
+    let fill_w = bar_fill_width(window.percent_used, bar_w);
     if fill_w > 0.0 {
         let bar_fill: objc2::rc::Retained<NSBox> =
             objc2::msg_send![mtm.alloc::<NSBox>(), initWithFrame: NSRect {
-                origin: NSPoint { x: 8.0, y: 18.0 },
+                origin: NSPoint { x: BAR_MARGIN, y: 18.0 },
                 size: NSSize { width: fill_w, height: 4.0 },
             }];
         bar_fill.setBoxType(NSBoxType::Custom);
@@ -267,8 +251,8 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
         detail_field.setFont(Some(&NSFont::systemFontOfSize(10.5)));
         detail_field.setTextColor(Some(&NSColor::secondaryLabelColor()));
         detail_field.setFrame(NSRect {
-            origin: NSPoint { x: 8.0, y: 2.0 },
-            size: NSSize { width: 270.0, height: 14.0 },
+            origin: NSPoint { x: BAR_MARGIN, y: 2.0 },
+            size: NSSize { width: bar_w, height: 14.0 },
         });
         container.addSubview(&detail_field);
     }
@@ -305,8 +289,10 @@ pub(super) fn style_menu(menu: &Menu, layout: &MenuLayout) {
             }
         }
 
-        let refresh = refresh_attr_str(layout.last_updated.as_deref());
-        apply_to_item(ns_menu, layout.refresh_idx, &refresh);
+        if let Some(item) = ns_menu.itemAtIndex(layout.refresh_idx as isize) {
+            let view = make_refresh_row_view(layout.last_updated.as_deref());
+            item.setView(Some(&view));
+        }
 
         // Footer order in append_footer: Refresh, separator, About, Quit
         // → About sits at refresh_idx + 2.
@@ -343,24 +329,27 @@ mod tests {
 
     #[test]
     fn bar_fill_width_50_pct() {
-        let w = bar_fill_width(Some(50.0));
-        assert!((w - 135.0).abs() < 0.01, "got {w}");
+        let bar_w = CONTAINER_W - 2.0 * BAR_MARGIN;
+        let w = bar_fill_width(Some(50.0), bar_w);
+        assert!((w - bar_w / 2.0).abs() < 0.01, "got {w}");
     }
 
     #[test]
     fn bar_fill_width_100_pct() {
-        let w = bar_fill_width(Some(100.0));
-        assert!((w - 270.0).abs() < 0.01, "got {w}");
+        let bar_w = CONTAINER_W - 2.0 * BAR_MARGIN;
+        let w = bar_fill_width(Some(100.0), bar_w);
+        assert!((w - bar_w).abs() < 0.01, "got {w}");
     }
 
     #[test]
     fn bar_fill_width_over_100_clamped() {
-        assert!((bar_fill_width(Some(150.0)) - 270.0).abs() < 0.01);
+        let bar_w = CONTAINER_W - 2.0 * BAR_MARGIN;
+        assert!((bar_fill_width(Some(150.0), bar_w) - bar_w).abs() < 0.01);
     }
 
     #[test]
     fn bar_fill_width_none_is_zero() {
-        assert_eq!(bar_fill_width(None), 0.0);
+        assert_eq!(bar_fill_width(None, CONTAINER_W - 2.0 * BAR_MARGIN), 0.0);
     }
 
     // format_reset
