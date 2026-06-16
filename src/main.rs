@@ -33,10 +33,13 @@ struct App {
     id_about: tray_icon::menu::MenuId,
     id_quit: tray_icon::menu::MenuId,
     id_refresh: tray_icon::menu::MenuId,
+    id_update: Option<tray_icon::menu::MenuId>,
     providers: Vec<Box<dyn UsageProvider>>,
     last_refreshed_at: Option<DateTime<Local>>,
     settings: Settings,
     next_poll_at: Instant,
+    next_update_check_after: DateTime<Local>,
+    update_available: Option<String>,
 }
 
 impl App {
@@ -53,10 +56,11 @@ impl App {
             states.iter().map(|(k, s)| (*k, s)).collect();
         let now = Local::now();
         let updated = now.format("%H:%M").to_string();
-        let build = ui::build_menu(&refs, Some(&updated), None);
+        let build = ui::build_menu(&refs, Some(&updated), self.update_available.as_deref());
         self.id_about = build.about;
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
+        self.id_update = build.update;
         self.tray.set_menu(Some(Box::new(build.menu)));
         self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
         self.last_refreshed_at = Some(now);
@@ -79,6 +83,15 @@ impl ApplicationHandler for App {
             did_refresh = true;
         }
 
+        if Local::now() >= self.next_update_check_after {
+            self.update_available = update_check::check();
+            self.next_update_check_after = Local::now() + chrono::Duration::hours(24);
+            if !did_refresh {
+                self.refresh();
+                did_refresh = true;
+            }
+        }
+
         if let Ok(ev) = MenuEvent::receiver().try_recv() {
             if ev.id == self.id_quit {
                 event_loop.exit();
@@ -87,6 +100,10 @@ impl ApplicationHandler for App {
             } else if ev.id == self.id_refresh && !did_refresh {
                 self.refresh();
                 self.next_poll_at = Instant::now() + self.settings.poll_interval;
+            } else if self.id_update.as_ref().map_or(false, |id| ev.id == *id) {
+                let _ = std::process::Command::new("open")
+                    .arg("https://github.com/mttpla/aiusagebar/releases/latest")
+                    .spawn();
             }
         }
 
@@ -137,10 +154,13 @@ fn main() {
         id_about: build.about,
         id_quit: build.quit,
         id_refresh: build.refresh,
+        id_update: build.update,
         providers,
         last_refreshed_at: None,
         settings,
         next_poll_at,
+        next_update_check_after: Local::now() + chrono::Duration::hours(24),
+        update_available: None,
     };
     event_loop.run_app(&mut app).expect("event loop error");
 }
