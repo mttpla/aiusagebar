@@ -92,8 +92,14 @@ git-cliff --config cliff.toml --tag "v$NEW" -o CHANGELOG.md
 # Commit and tag
 git add Cargo.toml Cargo.lock CHANGELOG.md
 git commit -m "chore(release): v$NEW"
-git tag "v$NEW"
+git tag -a "v$NEW" -m "Release v$NEW"
 
 echo ""
-echo "Done. To publish:"
-echo "  git push && git push --tags"
+read -r -p "Push to origin now? [y/N] " PUSH
+if [[ "$PUSH" == "y" || "$PUSH" == "Y" ]]; then
+    git push origin master
+    git push origin "v$NEW"
+    echo "Pushed v$NEW to origin."
+else
+    echo "Skipped push. To publish later: git push origin master && git push origin v$NEW"
+fi
