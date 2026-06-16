@@ -1,18 +1,19 @@
 # AIUsageBar
 
-macOS menu bar app that shows AI coding quota usage for **OpenAI**, **Anthropic**, and **GitHub** Copilot.
+macOS menu bar app that shows AI coding quota usage for **Claude** and **Copilot**.
 
 Read-only monitor. Never sends prompts, never spends quota, never modifies credentials.
+
+![Demo screenshot](assets/demo.png)
 
 ---
 
 ## Providers
 
-| Provider   | Limit windows                          |
-|------------|----------------------------------------|
-| OpenAI     | 5h session · 7d weekly                 |
-| Anthropic  | 5h session · 7d weekly                 |
-| Copilot    | Monthly premium quota (per account)    |
+| Provider | Limit windows                       |
+|----------|-------------------------------------|
+| Claude   | 5h session · 7d weekly              |
+| Copilot  | Monthly premium quota (per account) |
 
 Per-provider states: **Not configured** · **Stale** (renew via official client) · **OK** · **Error**.
 
