@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1] - 2026-06-16
+
+### Bug Fixes
+
+- Explicitly set TlsProvider::NativeTls — ureq 3 defaults to Rustls
+- Restore Refresh click — drop setView, remove tab stop
+- Compare CFString directly instead of allocating to_string
+
+### Documentation
+
+- Add spec and kanban card #40 for ureq migration
+- Add implementation plan for ureq migration (#40)
+- Link plan to kanban card #40
+
 ## [0.3.0] - 2026-06-15
 
 ### Bug Fixes
