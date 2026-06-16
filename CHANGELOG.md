@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.3.2] - 2026-06-16
+## [v0.3.2] - 2026-06-16
 
 ### Bug Fixes
 
 - Sync Cargo.lock in release.sh, commit alongside Cargo.toml
 
-## [0.3.1] - 2026-06-16
+## [v0.3.1] - 2026-06-16
 
 ### Bug Fixes
 
@@ -20,7 +20,7 @@
 - Add implementation plan for ureq migration (#40)
 - Link plan to kanban card #40
 
-## [0.3.0] - 2026-06-15
+## [v0.3.0] - 2026-06-15
 
 ### Bug Fixes
 
@@ -49,7 +49,7 @@
 - Hoist Local::now() out of window loop
 - Centralize reset-time TZ conversion in ui/time.rs
 
-## [0.2.0] - 2026-06-13
+## [v0.2.0] - 2026-06-13
 
 ### Bug Fixes
 
