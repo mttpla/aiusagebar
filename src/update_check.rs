@@ -19,7 +19,12 @@ pub(crate) fn parse_release(json: &str) -> Option<String> {
 }
 
 pub fn check() -> Option<String> {
-    todo!()
+    let json = crate::http::get_public(
+        "https://api.github.com/repos/mttpla/aiusagebar/releases/latest",
+    )
+    .ok()?;
+    let remote = parse_release(&json)?;
+    is_newer(env!("CARGO_PKG_VERSION"), &remote).then(|| remote)
 }
 
 pub(crate) fn is_newer(current: &str, remote: &str) -> bool {
