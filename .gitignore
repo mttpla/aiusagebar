@@ -4,3 +4,4 @@ target/
 .superpowers/
 .venv/
 __pycache__/
+dist/
