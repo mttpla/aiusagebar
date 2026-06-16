@@ -69,6 +69,17 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     exit 1
 fi
 
+# Rollback working tree if any step fails after this point
+cleanup_on_error() {
+    local rc=$?
+    echo "" >&2
+    echo "Error: release failed (exit $rc). Rolling back working tree..." >&2
+    git checkout -- Cargo.toml CHANGELOG.md 2>/dev/null || true
+    echo "  (if a commit was already made: git reset --hard origin/master)" >&2
+    exit "$rc"
+}
+trap cleanup_on_error ERR
+
 # Bump Cargo.toml (macOS sed syntax)
 sed -i '' "s/^version = \"$CURRENT\"/version = \"$NEW\"/" Cargo.toml
 
