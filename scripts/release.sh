@@ -38,11 +38,14 @@ fi
 # Bump Cargo.toml (macOS sed syntax)
 sed -i '' "s/^version = \"$CURRENT\"/version = \"$NEW\"/" Cargo.toml
 
+# Sync Cargo.lock to new version
+cargo check -q
+
 # Regenerate CHANGELOG.md
 git-cliff --config cliff.toml --tag "v$NEW" -o CHANGELOG.md
 
 # Commit and tag
-git add Cargo.toml CHANGELOG.md
+git add Cargo.toml Cargo.lock CHANGELOG.md
 git commit -m "chore(release): v$NEW"
 git tag "v$NEW"
 
