@@ -8,6 +8,25 @@ Read-only monitor. Never sends prompts, never spends quota, never modifies crede
 
 ---
 
+## Installation
+
+Download `aiusagebar-macos-arm64-vX.Y.Z` from [GitHub Releases](https://github.com/mttpla/aiusagebar/releases), then:
+
+```bash
+chmod +x aiusagebar-macos-arm64-vX.Y.Z
+mv aiusagebar-macos-arm64-vX.Y.Z /usr/local/bin/aiusagebar   # or any directory in $PATH
+aiusagebar &
+```
+
+**First launch — Gatekeeper warning:** macOS blocks unsigned downloads. Two workarounds (pick one):
+
+- Right-click the binary in Finder → **Open** → confirm in the dialog.
+- Or from Terminal: `xattr -dr com.apple.quarantine /usr/local/bin/aiusagebar`
+
+After the first launch the warning never appears again.
+
+---
+
 ## Providers
 
 | Provider | Limit windows                       |
