@@ -1,6 +1,6 @@
 ---
 id: 20
-status: backlog
+status: done
 priority: Normal
 tags: [release, ux, post-1.0]
 created: 2026-06-13
