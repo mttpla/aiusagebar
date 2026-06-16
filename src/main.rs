@@ -100,7 +100,7 @@ impl ApplicationHandler for App {
             } else if ev.id == self.id_refresh && !did_refresh {
                 self.refresh();
                 self.next_poll_at = Instant::now() + self.settings.poll_interval;
-            } else if self.id_update.as_ref().map_or(false, |id| ev.id == *id) {
+            } else if self.id_update.as_ref().is_some_and(|id| ev.id == *id) {
                 let _ = std::process::Command::new("open")
                     .arg("https://github.com/mttpla/aiusagebar/releases/latest")
                     .spawn();

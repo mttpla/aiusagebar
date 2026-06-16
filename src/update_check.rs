@@ -24,7 +24,7 @@ pub fn check() -> Option<String> {
     )
     .ok()?;
     let remote = parse_release(&json)?;
-    is_newer(env!("CARGO_PKG_VERSION"), &remote).then(|| remote)
+    is_newer(env!("CARGO_PKG_VERSION"), &remote).then_some(remote)
 }
 
 pub(crate) fn is_newer(current: &str, remote: &str) -> bool {
