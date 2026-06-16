@@ -40,6 +40,22 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<Str
     }
 }
 
+pub fn get_public(url: &str) -> Result<String, HttpError> {
+    let resp = agent()
+        .get(url)
+        .call()
+        .map_err(|e| HttpError::Other(e.to_string()))?;
+    match resp.status().as_u16() {
+        200 => resp
+            .into_body()
+            .read_to_string()
+            .map_err(|e| HttpError::Other(e.to_string())),
+        401 => Err(HttpError::Unauthorized),
+        429 => Err(HttpError::RateLimited),
+        code => Err(HttpError::Other(format!("HTTP {}", code))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -47,5 +63,11 @@ mod tests {
         let a = super::agent() as *const ureq::Agent;
         let b = super::agent() as *const ureq::Agent;
         assert_eq!(a, b, "agent() must return the same instance across calls");
+    }
+
+    #[test]
+    fn get_public_function_exists_and_compiles() {
+        // structural: verifies the function signature is correct
+        let _: fn(&str) -> Result<String, super::HttpError> = super::get_public;
     }
 }
