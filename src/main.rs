@@ -7,6 +7,7 @@ mod version;
 mod about;
 mod provider;
 mod ui;
+mod update_check;
 
 use std::time::Instant;
 use chrono::{DateTime, Local};
