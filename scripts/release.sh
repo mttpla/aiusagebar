@@ -62,6 +62,11 @@ if git ls-remote --tags --exit-code origin "v$NEW" >/dev/null 2>&1; then
     exit 1
 fi
 
+echo "Running quality gate (clippy + tests)..."
+cargo clippy -- -D warnings
+cargo test
+echo "Quality gate passed."
+
 echo "Bumping $CURRENT → $NEW"
 read -r -p "Continue? [y/N] " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
