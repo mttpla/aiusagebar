@@ -53,7 +53,7 @@ impl App {
             states.iter().map(|(k, s)| (*k, s)).collect();
         let now = Local::now();
         let updated = now.format("%H:%M").to_string();
-        let build = ui::build_menu(&refs, Some(&updated));
+        let build = ui::build_menu(&refs, Some(&updated), None);
         self.id_about = build.about;
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
@@ -119,7 +119,7 @@ fn main() {
         .iter()
         .map(|p| (p.kind(), &initial_state))
         .collect();
-    let build = ui::build_menu(&initial_refs, None);
+    let build = ui::build_menu(&initial_refs, None, None);
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(build.menu))

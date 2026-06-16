@@ -14,6 +14,7 @@ pub struct MenuBuild {
     pub about: MenuId,
     pub refresh: MenuId,
     pub quit: MenuId,
+    pub update: Option<MenuId>,
 }
 
 pub(crate) struct MenuLayout {
@@ -29,8 +30,9 @@ pub(crate) struct MenuLayout {
 pub(crate) fn build_layout(
     states: &[(ProviderKind, &UsageState)],
     last_updated: Option<&str>,
+    update: Option<&str>,
 ) -> MenuLayout {
-    let mut idx: usize = 0;
+    let mut idx: usize = if update.is_some() { 2 } else { 0 };
     let mut header_indices: Vec<(usize, ProviderKind)> = Vec::new();
     let mut window_items: Vec<(usize, LimitWindow)> = Vec::new();
 
@@ -62,8 +64,24 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
         .expect("menu append failed");
 }
 
-pub fn build_menu(states: &[(ProviderKind, &UsageState)], last_updated: Option<&str>) -> MenuBuild {
+pub fn build_menu(
+    states: &[(ProviderKind, &UsageState)],
+    last_updated: Option<&str>,
+    update: Option<&str>,
+) -> MenuBuild {
     let menu = Menu::new();
+
+    use tray_icon::menu::PredefinedMenuItem;
+    let update_id: Option<MenuId> = if let Some(version) = update {
+        let item = MenuItem::new(format!("↑ Update available {}", version), true, None);
+        let id = item.id().clone();
+        menu.append(&item).expect("menu append failed");
+        menu.append(&PredefinedMenuItem::separator()).expect("menu append failed");
+        Some(id)
+    } else {
+        None
+    };
+
     for (kind, state) in states {
         match kind {
             ProviderKind::Claude => { let _ = claude::append_claude_section(&menu, state); }
@@ -71,7 +89,7 @@ pub fn build_menu(states: &[(ProviderKind, &UsageState)], last_updated: Option<&
         }
     }
     let footer = base::append_footer(&menu);
-    let layout = build_layout(states, last_updated);
+    let layout = build_layout(states, last_updated, update);
 
     #[cfg(target_os = "macos")]
     styled::style_menu(&menu, &layout);
@@ -84,6 +102,7 @@ pub fn build_menu(states: &[(ProviderKind, &UsageState)], last_updated: Option<&
         about: footer.about,
         refresh: footer.refresh,
         quit: footer.quit,
+        update: update_id,
     }
 }
 
@@ -95,7 +114,7 @@ mod tests {
     #[test]
     fn menu_layout_indices_no_providers() {
         // Refresh(0) + sep(1) + About(2) + Quit(3)
-        let layout = build_layout(&[], None);
+        let layout = build_layout(&[], None, None);
         assert_eq!(layout.refresh_idx, 0);
         assert_eq!(layout.quit_idx, 3);
         assert!(layout.header_indices.is_empty());
@@ -110,7 +129,7 @@ mod tests {
             ],
             Some("max".into()),
         );
-        let layout = build_layout(&[(ProviderKind::Claude, &state)], None);
+        let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.header_indices[0].0, 0);
         assert_eq!(layout.refresh_idx, 3);
         assert_eq!(layout.quit_idx, 6);
@@ -125,7 +144,7 @@ mod tests {
             ],
             Some("max".into()),
         );
-        let layout = build_layout(&[(ProviderKind::Claude, &state)], None);
+        let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.window_items.len(), 2);
         assert_eq!(layout.window_items[0].0, 1);
         assert_eq!(layout.window_items[1].0, 2);
@@ -150,6 +169,7 @@ mod tests {
         let layout = build_layout(
             &[(ProviderKind::Claude, &claude_state), (ProviderKind::Copilot, &copilot_state)],
             None,
+            None,
         );
         assert_eq!(layout.window_items.len(), 3);
         assert_eq!(layout.window_items[0].0, 1);
@@ -162,7 +182,34 @@ mod tests {
 
     #[test]
     fn build_layout_non_ok_state_no_window_items() {
-        let layout = build_layout(&[(ProviderKind::Claude, &UsageState::NotConfigured)], None);
+        let layout = build_layout(&[(ProviderKind::Claude, &UsageState::NotConfigured)], None, None);
         assert!(layout.window_items.is_empty());
+    }
+
+    #[test]
+    fn build_layout_with_update_shifts_all_indices_by_2() {
+        let state = UsageState::Ok(
+            vec![LimitWindow { name: "d".into(), ..Default::default() }],
+            Some("max".into()),
+        );
+        let layout = build_layout(&[(ProviderKind::Claude, &state)], None, Some("0.4.0"));
+        // header was at 0 without update, now at 2
+        assert_eq!(layout.header_indices[0].0, 2);
+        // window item was at 1, now at 3
+        assert_eq!(layout.window_items[0].0, 3);
+        // refresh was at 2 (1 header + 1 window + footer), now at 4
+        assert_eq!(layout.refresh_idx, 4);
+        assert_eq!(layout.quit_idx, 7);
+    }
+
+    #[test]
+    fn build_layout_without_update_unchanged() {
+        let state = UsageState::Ok(
+            vec![LimitWindow { name: "d".into(), ..Default::default() }],
+            Some("max".into()),
+        );
+        let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
+        assert_eq!(layout.header_indices[0].0, 0);
+        assert_eq!(layout.refresh_idx, 2);
     }
 }
