@@ -34,7 +34,7 @@ pub fn enumerate_generic_passwords(service: &str) -> Vec<(String, String)> {
             // Keychain attribute dict keys are always CFString — cast is safe per Security.framework docs.
             let account = keys.iter().zip(values.iter()).find_map(|(k_ptr, v_ptr)| {
                 let k = unsafe { CFString::wrap_under_get_rule(*k_ptr as CFStringRef) };
-                if k.to_string() == "acct" {
+                if k == "acct" {
                     let v = unsafe { CFString::wrap_under_get_rule(*v_ptr as CFStringRef) };
                     Some(v.to_string())
                 } else {
