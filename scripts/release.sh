@@ -106,5 +106,38 @@ if [[ "$PUSH" == "y" || "$PUSH" == "Y" ]]; then
     git push origin "v$NEW"
     echo "Pushed v$NEW to origin."
 else
-    echo "Skipped push. To publish later: git push origin master && git push origin v$NEW"
+    echo "Skipped push. To publish later:"
+    echo "  git push origin master && git push origin v$NEW"
+    echo "  cargo build --release"
+    echo "  codesign --force -s - target/release/aiusagebar"
+    echo "  mkdir -p dist && cp target/release/aiusagebar dist/aiusagebar-macos-arm64-v$NEW"
+    echo "  gh release create v$NEW --title v$NEW --notes-file <notes-file> dist/aiusagebar-macos-arm64-v$NEW"
+    exit 0
 fi
+
+trap 'echo "" >&2; echo "Post-push step failed. Tag v$NEW is live on origin." >&2; echo "Run the build/sign/release steps manually." >&2' ERR
+
+echo "Building release binary..."
+cargo build --release
+
+echo "Signing binary (ad-hoc)..."
+codesign --force -s - target/release/aiusagebar
+codesign --verify --verbose target/release/aiusagebar
+
+echo "Packaging..."
+mkdir -p dist
+cp target/release/aiusagebar "dist/aiusagebar-macos-arm64-v${NEW}"
+
+echo "Extracting release notes from CHANGELOG.md..."
+NOTES=$(mktemp)
+awk -v tag="## [v${NEW}]" 'index($0,tag)==1{p=1;next} /^## \[/{p=0} p' CHANGELOG.md > "$NOTES"
+
+echo "Creating GitHub release..."
+gh release create "v${NEW}" \
+    "dist/aiusagebar-macos-arm64-v${NEW}" \
+    --title "v${NEW}" \
+    --notes-file "$NOTES"
+rm -f "$NOTES"
+
+echo ""
+echo "Released: https://github.com/mttpla/aiusagebar/releases/tag/v${NEW}"
