@@ -43,6 +43,7 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<Str
 pub fn get_public(url: &str) -> Result<String, HttpError> {
     let resp = agent()
         .get(url)
+        .header("User-Agent", concat!("aiusagebar/", env!("CARGO_PKG_VERSION")))
         .call()
         .map_err(|e| HttpError::Other(e.to_string()))?;
     match resp.status().as_u16() {
