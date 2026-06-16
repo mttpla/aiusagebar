@@ -16,6 +16,30 @@ if [[ "$(pwd)" != "$REPO_ROOT" ]]; then
     exit 1
 fi
 
+# Pre-flight: branch
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+[[ "$BRANCH" == "master" ]] || {
+    echo "Error: must be on master (current: $BRANCH)" >&2
+    exit 1
+}
+
+# Pre-flight: working tree clean
+git diff --quiet && git diff --cached --quiet || {
+    echo "Error: working tree not clean. Commit or stash first." >&2
+    exit 1
+}
+
+# Pre-flight: sync with origin
+git fetch --quiet origin master
+LOCAL="$(git rev-parse HEAD)"
+REMOTE="$(git rev-parse origin/master)"
+[[ "$LOCAL" == "$REMOTE" ]] || {
+    echo "Error: local master not in sync with origin/master." >&2
+    echo "  local:  $LOCAL" >&2
+    echo "  remote: $REMOTE" >&2
+    exit 1
+}
+
 # Parse current version from Cargo.toml
 CURRENT="$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')"
 MAJOR="$(echo "$CURRENT" | cut -d. -f1)"
@@ -27,6 +51,16 @@ case "$BUMP" in
     minor) NEW="${MAJOR}.$((MINOR + 1)).0" ;;
     patch) NEW="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
 esac
+
+# Pre-flight: tag must not exist locally or on origin
+if git rev-parse "v$NEW" >/dev/null 2>&1; then
+    echo "Error: tag v$NEW already exists locally." >&2
+    exit 1
+fi
+if git ls-remote --tags --exit-code origin "v$NEW" >/dev/null 2>&1; then
+    echo "Error: tag v$NEW already exists on origin." >&2
+    exit 1
+fi
 
 echo "Bumping $CURRENT → $NEW"
 read -r -p "Continue? [y/N] " CONFIRM
