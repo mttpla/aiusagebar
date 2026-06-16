@@ -1,6 +1,6 @@
 ---
 id: 11
-status: doing
+status: done
 priority: High
 tags: [release, pre-1.0]
 plan: superpowers/plans/2026-06-16-binary-release-pipeline.md
