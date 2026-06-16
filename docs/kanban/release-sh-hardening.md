@@ -4,8 +4,9 @@ status: todo
 priority: Normal
 tags: [release, tooling]
 spec: superpowers/specs/2026-06-14-release-sh-hardening-design.md
+plan: superpowers/plans/2026-06-16-release-sh-hardening.md
 created: 2026-06-14
-updated: 2026-06-14
+updated: 2026-06-16
 ---
 # release.sh hardening
 

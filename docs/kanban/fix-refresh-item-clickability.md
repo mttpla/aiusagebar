@@ -1,6 +1,10 @@
 ---
+id: 41
 title: Fix Refresh menu item clickability + footer button tests
-status: in-progress
+status: done
+priority: High
+created: 2026-06-16
+updated: 2026-06-16
 ---
 
 ## Problem
@@ -63,3 +67,5 @@ right-alignment (visual nicety) to keep items clickable (core behavior).
 Inline "·" separator gives visual separation without layout machinery.
 Tests for all three footer items prevent the same class of regression in
 future style refactors.
+
+- 2026-06-16: Done. Shipped in commit f757d27 (fix(ui): restore Refresh click — drop setView, remove tab stop). Released in v0.3.2.
