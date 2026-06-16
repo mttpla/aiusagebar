@@ -1,5 +1,43 @@
 # Changelog
 
+## [v0.4.0] - 2026-06-16
+
+### Bug Fixes
+
+- Use v-prefix in cliff.toml heading, backfill CHANGELOG
+- Add User-Agent header to get_public
+- Then_some and is_some_and
+
+### Documentation
+
+- Close cards #40 #41, link plan to #36
+- Close card #36 release.sh hardening
+- Drop OpenAI/Codex, unify provider names, add screenshot placeholder
+- Re-scope #11 to binary release, create #42 DMG card, update #37 narrative
+- Add demo screenshot for README
+- Close card #10, update #34 narrative
+- Update demo screenshot, close kanban card #11
+- Add spec and plan for auto-update check
+- Close card #20 auto-update check
+
+### Features
+
+- Add pre-flight checks (branch, clean tree, sync, tag-exists)
+- Add ERR trap — rollback Cargo.toml + CHANGELOG on failure
+- Annotated tag, interactive push prompt
+- Add clippy + test quality gate before version bump
+- Build, sign, and publish arm64 binary to GitHub Releases
+- Add get_public for unauthenticated requests
+- Add is_newer version comparison
+- Add parse_release JSON extraction
+- Implement check() via GitHub Releases API
+- Prepend update row to tray menu when newer release available
+- Wire up 24h update check with wall-clock timer
+
+### Miscellaneous
+
+- Add dist/ to .gitignore and add Installation section to README
+
 ## [v0.3.2] - 2026-06-16
 
 ### Bug Fixes
