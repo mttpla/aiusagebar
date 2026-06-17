@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local};
-use tray_icon::menu::Menu;
+use tray_icon::menu::{Menu, MenuId, MenuItem};
 use crate::provider::{LimitWindow, ProviderKind, UsageState};
 
 pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
@@ -8,7 +8,7 @@ pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
         UsageState::Ok(_, None) => name.to_string(),
         UsageState::Stale(msg) => format!("{} ⚠  {}", name, msg),
         UsageState::Error(msg) => format!("{} ✕  {}", name, msg),
-        UsageState::NotConfigured => format!("{}: not configured", name),
+        UsageState::NotConfigured => format!("{} — not signed in · Setup…", name),
     }
 }
 
@@ -34,17 +34,25 @@ pub(crate) fn section_item_count(state: &UsageState) -> usize {
     }
 }
 
-pub(crate) fn append_copilot_section(menu: &Menu, state: &UsageState) -> usize {
+pub(crate) fn append_copilot_section(menu: &Menu, state: &UsageState) -> Option<MenuId> {
+    if let UsageState::NotConfigured = state {
+        let item = MenuItem::new(
+            header_label(ProviderKind::Copilot.display_name(), state),
+            true,
+            None,
+        );
+        let id = item.id().clone();
+        menu.append(&item).expect("menu append failed");
+        return Some(id);
+    }
     super::append_label(menu, header_label(ProviderKind::Copilot.display_name(), state));
-    let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
         let now = Local::now();
         for w in windows {
             super::append_label(menu, row_label(w, now));
-            count += 1;
         }
     }
-    count
+    None
 }
 
 #[cfg(test)]
@@ -128,5 +136,14 @@ mod tests {
     fn header_ok_no_profile_shows_name_only() {
         let state = UsageState::Ok(vec![], None);
         assert_eq!(header_label("GitHub Copilot", &state), "GitHub Copilot");
+    }
+
+    #[test]
+    fn header_not_configured() {
+        let state = UsageState::NotConfigured;
+        assert_eq!(
+            header_label("GitHub Copilot", &state),
+            "GitHub Copilot — not signed in · Setup…"
+        );
     }
 }
