@@ -15,6 +15,10 @@ pub struct MenuBuild {
     pub refresh: MenuId,
     pub quit: MenuId,
     pub update: Option<MenuId>,
+    #[expect(dead_code)]
+    pub setup_claude: Option<MenuId>,
+    #[expect(dead_code)]
+    pub setup_copilot: Option<MenuId>,
 }
 
 pub(crate) struct MenuLayout {
@@ -82,10 +86,16 @@ pub fn build_menu(
         None
     };
 
+    let mut setup_claude: Option<MenuId> = None;
+    let mut setup_copilot: Option<MenuId> = None;
     for (kind, state) in states {
         match kind {
-            ProviderKind::Claude => { let _ = claude::append_claude_section(&menu, state); }
-            ProviderKind::Copilot => { let _ = copilot::append_copilot_section(&menu, state); }
+            ProviderKind::Claude => {
+                setup_claude = claude::append_claude_section(&menu, state);
+            }
+            ProviderKind::Copilot => {
+                setup_copilot = copilot::append_copilot_section(&menu, state);
+            }
         }
     }
     let footer = base::append_footer(&menu);
@@ -103,6 +113,8 @@ pub fn build_menu(
         refresh: footer.refresh,
         quit: footer.quit,
         update: update_id,
+        setup_claude,
+        setup_copilot,
     }
 }
 
