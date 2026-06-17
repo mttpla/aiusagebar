@@ -1,5 +1,5 @@
 use chrono::Local;
-use tray_icon::menu::Menu;
+use tray_icon::menu::{Menu, MenuId, MenuItem};
 use crate::provider::{ProviderKind, UsageState};
 
 pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
@@ -8,7 +8,7 @@ pub(crate) fn header_label(name: &str, state: &UsageState) -> String {
         UsageState::Ok(_, None) => format!("{} — account unavailable", name),
         UsageState::Stale(msg) => format!("{} ⚠  {}", name, msg),
         UsageState::Error(msg) => format!("{} ✕  {}", name, msg),
-        UsageState::NotConfigured => format!("{}: not configured", name),
+        UsageState::NotConfigured => format!("{} — not signed in · Setup…", name),
     }
 }
 
@@ -26,9 +26,18 @@ pub(crate) fn section_item_count(state: &UsageState) -> usize {
     }
 }
 
-pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> usize {
+pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> Option<MenuId> {
+    if let UsageState::NotConfigured = state {
+        let item = MenuItem::new(
+            header_label(ProviderKind::Claude.display_name(), state),
+            true,
+            None,
+        );
+        let id = item.id().clone();
+        menu.append(&item).expect("menu append failed");
+        return Some(id);
+    }
     super::append_label(menu, header_label(ProviderKind::Claude.display_name(), state));
-    let mut count = 1usize;
     if let UsageState::Ok(windows, _) = state {
         let now = Local::now();
         for w in windows {
@@ -41,10 +50,9 @@ pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> usize {
                 menu,
                 format!("  {} — {}  resets {}", w.name, pct_label(w.percent_used), reset),
             );
-            count += 1;
         }
     }
-    count
+    None
 }
 
 #[cfg(test)]
@@ -86,7 +94,7 @@ mod tests {
     fn header_not_configured() {
         assert_eq!(
             header_label("Claude", &UsageState::NotConfigured),
-            "Claude: not configured"
+            "Claude — not signed in · Setup…"
         );
     }
 
