@@ -15,9 +15,7 @@ pub struct MenuBuild {
     pub refresh: MenuId,
     pub quit: MenuId,
     pub update: Option<MenuId>,
-    #[expect(dead_code)]
     pub setup_claude: Option<MenuId>,
-    #[expect(dead_code)]
     pub setup_copilot: Option<MenuId>,
 }
 
