@@ -34,6 +34,8 @@ struct App {
     id_quit: tray_icon::menu::MenuId,
     id_refresh: tray_icon::menu::MenuId,
     id_update: Option<tray_icon::menu::MenuId>,
+    id_setup_claude: Option<tray_icon::menu::MenuId>,
+    id_setup_copilot: Option<tray_icon::menu::MenuId>,
     providers: Vec<Box<dyn UsageProvider>>,
     last_refreshed_at: Option<DateTime<Local>>,
     settings: Settings,
@@ -61,6 +63,8 @@ impl App {
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
         self.id_update = build.update;
+        self.id_setup_claude = build.setup_claude;
+        self.id_setup_copilot = build.setup_copilot;
         self.tray.set_menu(Some(Box::new(build.menu)));
         self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
         self.last_refreshed_at = Some(now);
@@ -104,6 +108,10 @@ impl ApplicationHandler for App {
                 let _ = std::process::Command::new("open")
                     .arg("https://github.com/mttpla/aiusagebar/releases/latest")
                     .spawn();
+            } else if self.id_setup_claude.as_ref().is_some_and(|id| ev.id == *id) {
+                // Setup Claude handler
+            } else if self.id_setup_copilot.as_ref().is_some_and(|id| ev.id == *id) {
+                // Setup Copilot handler
             }
         }
 
@@ -155,6 +163,8 @@ fn main() {
         id_quit: build.quit,
         id_refresh: build.refresh,
         id_update: build.update,
+        id_setup_claude: build.setup_claude,
+        id_setup_copilot: build.setup_copilot,
         providers,
         last_refreshed_at: None,
         settings,
