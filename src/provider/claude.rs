@@ -133,7 +133,7 @@ struct UsageResponse {
 #[derive(Deserialize)]
 struct WindowData {
     utilization: f32,
-    resets_at: String,
+    resets_at: Option<String>,
 }
 
 fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
@@ -144,7 +144,7 @@ fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
             percent_used: Some(resp.five_hour.utilization),
             limit: None,
             remaining: None,
-            resets_at: Some(resp.five_hour.resets_at),
+            resets_at: resp.five_hour.resets_at,
             unlimited: false,
         },
         LimitWindow {
@@ -152,7 +152,7 @@ fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
             percent_used: Some(resp.seven_day.utilization),
             limit: None,
             remaining: None,
-            resets_at: Some(resp.seven_day.resets_at),
+            resets_at: resp.seven_day.resets_at,
             unlimited: false,
         },
     ])
@@ -316,6 +316,14 @@ mod tests {
     #[test]
     fn parse_missing_field_is_error() {
         assert!(super::parse_response("{}").is_err());
+    }
+
+    #[test]
+    fn parse_response_null_resets_at_is_ok() {
+        let body = r#"{"five_hour":{"utilization":10.0,"resets_at":null},"seven_day":{"utilization":5.0,"resets_at":null}}"#;
+        let windows = super::parse_response(body).unwrap();
+        assert_eq!(windows[0].resets_at, None);
+        assert_eq!(windows[1].resets_at, None);
     }
 
     #[test]
