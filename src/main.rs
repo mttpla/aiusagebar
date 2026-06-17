@@ -1,3 +1,4 @@
+mod backoff;
 mod http;
 mod icon;
 mod keychain;
@@ -9,8 +10,11 @@ mod provider;
 mod ui;
 mod update_check;
 
+use std::collections::HashMap;
 use std::time::Instant;
+use backoff::BackoffState;
 use chrono::{DateTime, Local};
+use http::HttpError;
 use icon::{IconKind, Icons};
 use settings::Settings;
 use provider::claude::ClaudeProvider;
@@ -44,21 +48,40 @@ struct App {
     providers: Vec<Box<dyn UsageProvider>>,
     last_refreshed_at: Option<DateTime<Local>>,
     settings: Settings,
-    next_poll_at: Instant,
+    backoff: HashMap<ProviderKind, BackoffState>,
     next_update_check_after: DateTime<Local>,
     update_available: Option<String>,
 }
 
 impl App {
-    fn refresh(&mut self) {
-        let states: Vec<(ProviderKind, UsageState)> = self.providers
-            .iter()
-            .map(|p| (p.kind(), p.fetch()))
-            .collect();
-
+    fn refresh_all(&mut self, force: bool) {
+        let count = self.providers.len();
+        let mut states: Vec<(ProviderKind, UsageState)> = Vec::with_capacity(count);
+        for i in 0..count {
+            let kind = self.providers[i].kind();
+            let is_allowed = self.backoff[&kind].is_allowed();
+            if !force && !is_allowed {
+                continue;
+            }
+            let (state, http_err) = self.providers[i].fetch_with_http_error();
+            let b = self.backoff.get_mut(&kind).expect("backoff entry missing");
+            match http_err {
+                Some(HttpError::RateLimited | HttpError::ServerError(_)) => {
+                    b.on_error(self.settings.backoff_factor, self.settings.backoff_cap);
+                }
+                _ => {
+                    if matches!(&state, UsageState::Ok(_, _)) {
+                        b.on_success(self.settings.poll_interval);
+                    }
+                }
+            }
+            states.push((kind, state));
+        }
+        if states.is_empty() {
+            return;
+        }
         let state_refs: Vec<&UsageState> = states.iter().map(|(_, s)| s).collect();
         let icon_kind = IconKind::for_providers(&state_refs, self.settings.alert_threshold_pct);
-
         let refs: Vec<(ProviderKind, &UsageState)> =
             states.iter().map(|(k, s)| (*k, s)).collect();
         let now = Local::now();
@@ -78,17 +101,16 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
-        self.refresh();
+        self.refresh_all(true);
     }
 
     fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        let now = Instant::now();
         let mut did_refresh = false;
-        if now >= self.next_poll_at {
-            self.refresh();
-            self.next_poll_at = now + self.settings.poll_interval;
+        let any_provider_ready = self.backoff.values().any(|b| b.is_allowed());
+        if any_provider_ready {
+            self.refresh_all(false);
             did_refresh = true;
         }
 
@@ -96,7 +118,7 @@ impl ApplicationHandler for App {
             self.update_available = update_check::check();
             self.next_update_check_after = Local::now() + chrono::Duration::hours(24);
             if !did_refresh {
-                self.refresh();
+                self.refresh_all(false);
                 did_refresh = true;
             }
         }
@@ -107,8 +129,7 @@ impl ApplicationHandler for App {
             } else if ev.id == self.id_about {
                 about::show();
             } else if ev.id == self.id_refresh && !did_refresh {
-                self.refresh();
-                self.next_poll_at = Instant::now() + self.settings.poll_interval;
+                self.refresh_all(true);
             } else if self.id_update.as_ref().is_some_and(|id| ev.id == *id) {
                 let _ = std::process::Command::new("open")
                     .arg("https://github.com/mttpla/aiusagebar/releases/latest")
@@ -121,7 +142,16 @@ impl ApplicationHandler for App {
         }
 
         let _ = TrayIconEvent::receiver().try_recv();
-        event_loop.set_control_flow(ControlFlow::WaitUntil(self.next_poll_at));
+        let next_provider = self.backoff.values()
+            .map(|b| b.next_allowed_at)
+            .min()
+            .unwrap_or_else(|| Instant::now() + self.settings.poll_interval);
+        let update_deadline = self.next_update_check_after
+            .signed_duration_since(Local::now())
+            .to_std()
+            .map(|d| Instant::now() + d)
+            .unwrap_or_else(|_| Instant::now());
+        event_loop.set_control_flow(ControlFlow::WaitUntil(next_provider.min(update_deadline)));
     }
 }
 
@@ -159,7 +189,10 @@ fn main() {
         .expect("failed to create tray icon");
 
     let settings = Settings::default();
-    let next_poll_at = Instant::now() + settings.poll_interval;
+    let backoff: HashMap<ProviderKind, BackoffState> = providers
+        .iter()
+        .map(|p| (p.kind(), BackoffState::new(settings.poll_interval)))
+        .collect();
 
     let mut app = App {
         tray,
@@ -173,7 +206,7 @@ fn main() {
         providers,
         last_refreshed_at: None,
         settings,
-        next_poll_at,
+        backoff,
         next_update_check_after: Local::now() + chrono::Duration::hours(24),
         update_available: None,
     };
