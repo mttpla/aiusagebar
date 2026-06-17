@@ -19,7 +19,7 @@ pub enum UsageState {
     Error(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProviderKind {
     Claude,
     Copilot,
@@ -36,7 +36,9 @@ impl ProviderKind {
 
 pub trait UsageProvider: Send + Sync {
     fn kind(&self) -> ProviderKind;
-    fn fetch(&self) -> UsageState;
+    /// Returns the usage state plus the raw HTTP error that caused it, if any.
+    /// Only `RateLimited` and `ServerError` errors trigger backoff in the caller.
+    fn fetch_with_http_error(&self) -> (UsageState, Option<crate::http::HttpError>);
 }
 
 #[cfg(test)]
