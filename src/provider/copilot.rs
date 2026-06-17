@@ -49,14 +49,15 @@ fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
 pub fn do_copilot_fetch(
     tokens: Vec<(String, String)>,
     http: &dyn Fn(&str) -> Result<String, HttpError>,
-) -> UsageState {
+) -> (UsageState, Option<HttpError>) {
     if tokens.is_empty() {
-        return UsageState::NotConfigured;
+        return (UsageState::NotConfigured, None);
     }
 
     let mut ok_windows: Vec<LimitWindow> = Vec::new();
     let mut stale_accounts: Vec<String> = Vec::new();
     let mut error_msgs: Vec<String> = Vec::new();
+    let mut backoff_err: Option<HttpError> = None;
 
     for (account, token) in &tokens {
         match http(token) {
@@ -65,7 +66,16 @@ pub fn do_copilot_fetch(
                 Err(e) => error_msgs.push(format!("@{} — {}", account, e)),
             },
             Err(HttpError::Unauthorized) => stale_accounts.push(account.clone()),
-            Err(HttpError::RateLimited) => error_msgs.push(format!("@{} — rate limited", account)),
+            Err(HttpError::RateLimited) => {
+                error_msgs.push(format!("@{} — rate limited", account));
+                backoff_err = Some(HttpError::RateLimited);
+            }
+            Err(HttpError::ServerError(c)) => {
+                error_msgs.push(format!("@{} — server error {c}", account));
+                if backoff_err.is_none() {
+                    backoff_err = Some(HttpError::ServerError(c));
+                }
+            }
             Err(HttpError::Other(e)) => error_msgs.push(format!("@{} — {}", account, e)),
         }
     }
@@ -91,16 +101,16 @@ pub fn do_copilot_fetch(
                 unlimited: false,
             });
         }
-        return UsageState::Ok(ok_windows, None);
+        return (UsageState::Ok(ok_windows, None), backoff_err);
     }
 
     if !stale_accounts.is_empty() {
-        return UsageState::Stale(
+        return (UsageState::Stale(
             "Copilot tokens expired — run: copilot auth login".to_string(),
-        );
+        ), None);
     }
 
-    UsageState::Error(error_msgs.join("; "))
+    (UsageState::Error(error_msgs.join("; ")), backoff_err)
 }
 
 fn load_copilot_tokens() -> Vec<(String, String)> {
@@ -127,7 +137,7 @@ impl crate::provider::UsageProvider for CopilotProvider {
         crate::provider::ProviderKind::Copilot
     }
 
-    fn fetch(&self) -> UsageState {
+    fn fetch_with_http_error(&self) -> (UsageState, Option<crate::http::HttpError>) {
         do_copilot_fetch(
             load_copilot_tokens(),
             &|token| {
@@ -233,13 +243,13 @@ mod tests {
 
     #[test]
     fn fetch_empty_tokens_returns_not_configured() {
-        let state = do_copilot_fetch(vec![], &|_| unreachable!());
+        let (state, _) = do_copilot_fetch(vec![], &|_| unreachable!());
         assert_eq!(state, UsageState::NotConfigured);
     }
 
     #[test]
     fn fetch_all_401_returns_stale() {
-        let state = do_copilot_fetch(
+        let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
             &|_| Err(HttpError::Unauthorized),
         );
@@ -248,7 +258,7 @@ mod tests {
 
     #[test]
     fn fetch_200_valid_returns_ok_with_windows() {
-        let state = do_copilot_fetch(
+        let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
             &|_| Ok(valid_body()),
         );
@@ -258,7 +268,7 @@ mod tests {
     #[test]
     fn fetch_mixed_success_and_401_returns_ok_with_sentinel() {
         let tokens = vec![tok("good_account", "good"), tok("bad_account", "bad")];
-        let state = do_copilot_fetch(tokens, &|tok| {
+        let (state, _) = do_copilot_fetch(tokens, &|tok| {
             if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Unauthorized) }
         });
         let UsageState::Ok(windows, _) = state else { panic!("expected Ok") };
@@ -271,7 +281,7 @@ mod tests {
 
     #[test]
     fn fetch_other_error_returns_error() {
-        let state = do_copilot_fetch(
+        let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
             &|_| Err(HttpError::Other("connection refused".to_string())),
         );
@@ -281,7 +291,7 @@ mod tests {
     #[test]
     fn fetch_error_sentinel_contains_account_name() {
         let tokens = vec![tok("good_account", "good"), tok("bad_account", "bad")];
-        let state = do_copilot_fetch(tokens, &|tok| {
+        let (state, _) = do_copilot_fetch(tokens, &|tok| {
             if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Other("timeout".to_string())) }
         });
         let UsageState::Ok(windows, _) = state else { panic!("expected Ok") };
@@ -293,7 +303,7 @@ mod tests {
 
     #[test]
     fn fetch_200_bad_body_returns_error() {
-        let state = do_copilot_fetch(
+        let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
             &|_| Ok("not json".to_string()),
         );

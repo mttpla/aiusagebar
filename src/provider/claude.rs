@@ -187,44 +187,46 @@ fn do_fetch(
     http: &dyn Fn(&str) -> Result<String, HttpError>,
     last_ok: &Mutex<Option<Vec<LimitWindow>>>,
     profile_string: Option<String>,
-) -> UsageState {
+) -> (UsageState, Option<HttpError>) {
     let creds = match creds {
-        CredLoad::NotConfigured => return UsageState::NotConfigured,
-        CredLoad::Malformed(e) => return UsageState::Error(format!("Malformed credentials: {}", e)),
+        CredLoad::NotConfigured => return (UsageState::NotConfigured, None),
+        CredLoad::Malformed(e) => return (UsageState::Error(format!("Malformed credentials: {}", e)), None),
         CredLoad::Ok(c) => c,
     };
     if is_expired(creds.expires_at_ms) {
         let date = format_expiry_date(creds.expires_at_ms);
-        return UsageState::Stale(format!("Expired on {} — run: claude login", date));
+        return (UsageState::Stale(format!("Expired on {} — run: claude login", date)), None);
     }
     match http(&creds.access_token) {
         Ok(body) => match parse_response(&body) {
             Ok(windows) => {
                 let windows = windows.to_vec();
                 *last_ok.lock().unwrap() = Some(windows.clone());
-                UsageState::Ok(windows, profile_string)
+                (UsageState::Ok(windows, profile_string), None)
             }
-            Err(e) => UsageState::Error(format!("Parse error: {}", e)),
+            Err(e) => (UsageState::Error(format!("Parse error: {}", e)), None),
         },
         Err(HttpError::Unauthorized) => {
-            UsageState::Stale("Token rejected — run: claude login".to_string())
+            (UsageState::Stale("Token rejected — run: claude login".to_string()), Some(HttpError::Unauthorized))
         }
         Err(HttpError::RateLimited) => {
-            last_ok
+            let state = last_ok
                 .lock()
                 .unwrap()
                 .clone()
                 .map(|w| UsageState::Ok(w, profile_string))
-                .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()))
+                .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()));
+            (state, Some(HttpError::RateLimited))
         }
-        Err(HttpError::Other(e)) => UsageState::Error(e),
+        Err(HttpError::ServerError(c)) => (UsageState::Error(format!("Server error {c}")), Some(HttpError::ServerError(c))),
+        Err(HttpError::Other(e)) => (UsageState::Error(e), None),
     }
 }
 
 impl UsageProvider for ClaudeProvider {
     fn kind(&self) -> crate::provider::ProviderKind { crate::provider::ProviderKind::Claude }
 
-    fn fetch(&self) -> UsageState {
+    fn fetch_with_http_error(&self) -> (UsageState, Option<HttpError>) {
         let ua = get_user_agent();
         let creds = load_credentials();
 
@@ -244,7 +246,7 @@ impl UsageProvider for ClaudeProvider {
             .as_ref()
             .map(|p| format!("{} ({})", p.email, p.plan));
 
-        let state = do_fetch(
+        let (state, http_err) = do_fetch(
             creds,
             &|token| crate::http::get(USAGE_URL, token, &[("User-Agent", ua)]),
             &self.last_ok,
@@ -255,7 +257,7 @@ impl UsageProvider for ClaudeProvider {
             *self.profile.lock().unwrap() = None;
         }
 
-        state
+        (state, http_err)
     }
 }
 
@@ -385,13 +387,13 @@ mod tests {
 
     #[test]
     fn do_fetch_not_configured() {
-        let state = super::do_fetch(CredLoad::NotConfigured, &|_| unreachable!(), &empty_cache(), None);
+        let (state, _) = super::do_fetch(CredLoad::NotConfigured, &|_| unreachable!(), &empty_cache(), None);
         assert_eq!(state, UsageState::NotConfigured);
     }
 
     #[test]
     fn do_fetch_malformed_creds() {
-        let state = super::do_fetch(
+        let (state, _) = super::do_fetch(
             CredLoad::Malformed("bad json".to_string()),
             &|_| unreachable!(),
             &empty_cache(),
@@ -406,13 +408,13 @@ mod tests {
             access_token: "tok".to_string(),
             expires_at_ms: 1_000,
         });
-        let state = super::do_fetch(creds, &|_| unreachable!(), &empty_cache(), None);
+        let (state, _) = super::do_fetch(creds, &|_| unreachable!(), &empty_cache(), None);
         assert!(matches!(state, UsageState::Stale(ref s) if s.contains("Expired on")));
     }
 
     #[test]
     fn do_fetch_401_returns_stale() {
-        let state = super::do_fetch(
+        let (state, _) = super::do_fetch(
             ok_creds(),
             &|_| Err(HttpError::Unauthorized),
             &empty_cache(),
@@ -423,7 +425,7 @@ mod tests {
 
     #[test]
     fn do_fetch_429_no_cache_returns_error() {
-        let state = super::do_fetch(
+        let (state, _) = super::do_fetch(
             ok_creds(),
             &|_| Err(HttpError::RateLimited),
             &empty_cache(),
@@ -442,13 +444,13 @@ mod tests {
             resets_at: None,
             unlimited: false,
         }]));
-        let state = super::do_fetch(ok_creds(), &|_| Err(HttpError::RateLimited), &cache, None);
+        let (state, _) = super::do_fetch(ok_creds(), &|_| Err(HttpError::RateLimited), &cache, None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w[0].percent_used == Some(42.0)));
     }
 
     #[test]
     fn do_fetch_200_bad_body_returns_error() {
-        let state = super::do_fetch(
+        let (state, _) = super::do_fetch(
             ok_creds(),
             &|_| Ok("garbage".to_string()),
             &empty_cache(),
@@ -460,7 +462,7 @@ mod tests {
     #[test]
     fn do_fetch_200_valid_returns_ok_and_populates_cache() {
         let cache = empty_cache();
-        let state = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache, None);
+        let (state, _) = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache, None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w.len() == 2));
         assert_eq!(cache.lock().unwrap().as_ref().map(|v| v.len()), Some(2), "cache must be populated with 2 windows after success");
     }
@@ -495,7 +497,7 @@ mod tests {
     #[test]
     fn do_fetch_passes_profile_string_into_ok() {
         let cache = empty_cache();
-        let state = super::do_fetch(
+        let (state, _) = super::do_fetch(
             ok_creds(),
             &|_| Ok(valid_body().to_string()),
             &cache,
@@ -510,7 +512,7 @@ mod tests {
     #[test]
     fn do_fetch_none_profile_propagates_to_ok() {
         let cache = empty_cache();
-        let state = super::do_fetch(
+        let (state, _) = super::do_fetch(
             ok_creds(),
             &|_| Ok(valid_body().to_string()),
             &cache,
@@ -529,7 +531,7 @@ mod tests {
             resets_at: None,
             unlimited: false,
         }]));
-        let state = super::do_fetch(
+        let (state, _) = super::do_fetch(
             ok_creds(),
             &|_| Err(HttpError::RateLimited),
             &cache,

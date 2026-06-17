@@ -2,10 +2,11 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use ureq::tls::{TlsConfig, TlsProvider};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum HttpError {
     Unauthorized,
     RateLimited,
+    ServerError(u16),
     Other(String),
 }
 
@@ -36,6 +37,7 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<Str
             .map_err(|e| HttpError::Other(e.to_string())),
         401 => Err(HttpError::Unauthorized),
         429 => Err(HttpError::RateLimited),
+        c @ 500..=599 => Err(HttpError::ServerError(c)),
         code => Err(HttpError::Other(format!("HTTP {}", code))),
     }
 }
@@ -53,6 +55,7 @@ pub fn get_public(url: &str) -> Result<String, HttpError> {
             .map_err(|e| HttpError::Other(e.to_string())),
         401 => Err(HttpError::Unauthorized),
         429 => Err(HttpError::RateLimited),
+        c @ 500..=599 => Err(HttpError::ServerError(c)),
         code => Err(HttpError::Other(format!("HTTP {}", code))),
     }
 }
