@@ -1,4 +1,4 @@
-use crate::http::HttpError;
+use crate::http::{GetResult, HttpError};
 use crate::provider::{LimitWindow, UsageState};
 
 fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
@@ -48,7 +48,7 @@ fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
 
 pub fn do_copilot_fetch(
     tokens: Vec<(String, String)>,
-    http: &dyn Fn(&str) -> Result<String, HttpError>,
+    http: &dyn Fn(&str) -> GetResult,
 ) -> (UsageState, Option<HttpError>) {
     if tokens.is_empty() {
         return (UsageState::NotConfigured, None);
@@ -60,7 +60,8 @@ pub fn do_copilot_fetch(
     let mut backoff_err: Option<HttpError> = None;
 
     for (account, token) in &tokens {
-        match http(token) {
+        let (result, _raw) = http(token);
+        match result {
             Ok(body) => match parse_copilot_response(&body) {
                 Ok(windows) => ok_windows.extend(windows),
                 Err(e) => error_msgs.push(format!("@{} — {}", account, e)),
@@ -251,7 +252,7 @@ mod tests {
     fn fetch_all_401_returns_stale() {
         let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
-            &|_| Err(HttpError::Unauthorized),
+            &|_| (Err(HttpError::Unauthorized), None),
         );
         assert!(matches!(state, UsageState::Stale(_)));
     }
@@ -260,7 +261,7 @@ mod tests {
     fn fetch_200_valid_returns_ok_with_windows() {
         let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
-            &|_| Ok(valid_body()),
+            &|_| (Ok(valid_body()), Some(valid_body())),
         );
         assert!(matches!(state, UsageState::Ok(ref w, _) if !w.is_empty()));
     }
@@ -269,7 +270,7 @@ mod tests {
     fn fetch_mixed_success_and_401_returns_ok_with_sentinel() {
         let tokens = vec![tok("good_account", "good"), tok("bad_account", "bad")];
         let (state, _) = do_copilot_fetch(tokens, &|tok| {
-            if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Unauthorized) }
+            if tok == "good" { (Ok(valid_body()), Some(valid_body())) } else { (Err(HttpError::Unauthorized), None) }
         });
         let UsageState::Ok(windows, _) = state else { panic!("expected Ok") };
         assert!(windows.iter().any(|w| w.percent_used.is_some()), "real window missing");
@@ -283,7 +284,7 @@ mod tests {
     fn fetch_other_error_returns_error() {
         let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
-            &|_| Err(HttpError::Other("connection refused".to_string())),
+            &|_| (Err(HttpError::Other("connection refused".to_string())), None),
         );
         assert!(matches!(state, UsageState::Error(ref s) if s.contains("connection refused")));
     }
@@ -292,7 +293,7 @@ mod tests {
     fn fetch_error_sentinel_contains_account_name() {
         let tokens = vec![tok("good_account", "good"), tok("bad_account", "bad")];
         let (state, _) = do_copilot_fetch(tokens, &|tok| {
-            if tok == "good" { Ok(valid_body()) } else { Err(HttpError::Other("timeout".to_string())) }
+            if tok == "good" { (Ok(valid_body()), Some(valid_body())) } else { (Err(HttpError::Other("timeout".to_string())), None) }
         });
         let UsageState::Ok(windows, _) = state else { panic!("expected Ok") };
         assert!(
@@ -305,7 +306,7 @@ mod tests {
     fn fetch_200_bad_body_returns_error() {
         let (state, _) = do_copilot_fetch(
             vec![tok("alice", "tok")],
-            &|_| Ok("not json".to_string()),
+            &|_| (Ok("not json".to_string()), Some("not json".to_string())),
         );
         assert!(matches!(state, UsageState::Error(_)));
     }

@@ -10,6 +10,10 @@ pub enum HttpError {
     Other(String),
 }
 
+/// Return type for [`get`]: the parsed result plus the raw body whenever the
+/// server responded (None only on network/IO errors).
+pub type GetResult = (Result<String, HttpError>, Option<String>);
+
 fn agent() -> &'static ureq::Agent {
     static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
     AGENT.get_or_init(|| {
@@ -22,24 +26,27 @@ fn agent() -> &'static ureq::Agent {
     })
 }
 
-pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> Result<String, HttpError> {
+pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> (Result<String, HttpError>, Option<String>) {
     let mut req = agent()
         .get(url)
         .header("Authorization", &format!("Bearer {}", token));
     for (name, value) in extra_headers {
         req = req.header(*name, *value);
     }
-    let resp = req.call().map_err(|e| HttpError::Other(e.to_string()))?;
-    match resp.status().as_u16() {
-        200 => resp
-            .into_body()
-            .read_to_string()
-            .map_err(|e| HttpError::Other(e.to_string())),
+    let resp = match req.call() {
+        Ok(r) => r,
+        Err(e) => return (Err(HttpError::Other(e.to_string())), None),
+    };
+    let status = resp.status().as_u16();
+    let raw = resp.into_body().read_to_string().ok();
+    let result = match status {
+        200 => raw.clone().map(Ok).unwrap_or_else(|| Err(HttpError::Other("body read error".into()))),
         401 => Err(HttpError::Unauthorized),
         429 => Err(HttpError::RateLimited),
         c @ 500..=599 => Err(HttpError::ServerError(c)),
         code => Err(HttpError::Other(format!("HTTP {}", code))),
-    }
+    };
+    (result, raw)
 }
 
 pub fn get_public(url: &str) -> Result<String, HttpError> {
@@ -73,5 +80,10 @@ mod tests {
     fn get_public_function_exists_and_compiles() {
         // structural: verifies the function signature is correct
         let _: fn(&str) -> Result<String, super::HttpError> = super::get_public;
+    }
+
+    #[test]
+    fn get_returns_tuple() {
+        let _: fn(&str, &str, &[(&str, &str)]) -> (Result<String, super::HttpError>, Option<String>) = super::get;
     }
 }

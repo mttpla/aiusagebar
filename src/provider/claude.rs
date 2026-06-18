@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::sync::{Mutex, OnceLock};
-use crate::http::HttpError;
+use crate::http::{GetResult, HttpError};
 use crate::provider::{LimitWindow, UsageState, UsageProvider};
 
 #[derive(Deserialize)]
@@ -177,14 +177,13 @@ impl ClaudeProvider {
 }
 
 fn fetch_profile(token: &str, ua: &str) -> Option<ProfileData> {
-    crate::http::get(PROFILE_URL, token, &[("User-Agent", ua)])
-        .ok()
-        .and_then(|body| parse_profile_response(&body).ok())
+    let (result, _) = crate::http::get(PROFILE_URL, token, &[("User-Agent", ua)]);
+    result.ok().and_then(|body| parse_profile_response(&body).ok())
 }
 
 fn do_fetch(
     creds: CredLoad,
-    http: &dyn Fn(&str) -> Result<String, HttpError>,
+    http: &dyn Fn(&str) -> GetResult,
     last_ok: &Mutex<Option<Vec<LimitWindow>>>,
     profile_string: Option<String>,
 ) -> (UsageState, Option<HttpError>) {
@@ -197,7 +196,8 @@ fn do_fetch(
         let date = format_expiry_date(creds.expires_at_ms);
         return (UsageState::Stale(format!("Expired on {} — run: claude login", date)), None);
     }
-    match http(&creds.access_token) {
+    let (result, _raw) = http(&creds.access_token);
+    match result {
         Ok(body) => match parse_response(&body) {
             Ok(windows) => {
                 let windows = windows.to_vec();
@@ -416,7 +416,7 @@ mod tests {
     fn do_fetch_401_returns_stale() {
         let (state, _) = super::do_fetch(
             ok_creds(),
-            &|_| Err(HttpError::Unauthorized),
+            &|_| (Err(HttpError::Unauthorized), None),
             &empty_cache(),
             None,
         );
@@ -427,7 +427,7 @@ mod tests {
     fn do_fetch_429_no_cache_returns_error() {
         let (state, _) = super::do_fetch(
             ok_creds(),
-            &|_| Err(HttpError::RateLimited),
+            &|_| (Err(HttpError::RateLimited), None),
             &empty_cache(),
             None,
         );
@@ -444,7 +444,7 @@ mod tests {
             resets_at: None,
             unlimited: false,
         }]));
-        let (state, _) = super::do_fetch(ok_creds(), &|_| Err(HttpError::RateLimited), &cache, None);
+        let (state, _) = super::do_fetch(ok_creds(), &|_| (Err(HttpError::RateLimited), None), &cache, None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w[0].percent_used == Some(42.0)));
     }
 
@@ -452,7 +452,7 @@ mod tests {
     fn do_fetch_200_bad_body_returns_error() {
         let (state, _) = super::do_fetch(
             ok_creds(),
-            &|_| Ok("garbage".to_string()),
+            &|_| (Ok("garbage".to_string()), Some("garbage".to_string())),
             &empty_cache(),
             None,
         );
@@ -462,7 +462,7 @@ mod tests {
     #[test]
     fn do_fetch_200_valid_returns_ok_and_populates_cache() {
         let cache = empty_cache();
-        let (state, _) = super::do_fetch(ok_creds(), &|_| Ok(valid_body().to_string()), &cache, None);
+        let (state, _) = super::do_fetch(ok_creds(), &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())), &cache, None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w.len() == 2));
         assert_eq!(cache.lock().unwrap().as_ref().map(|v| v.len()), Some(2), "cache must be populated with 2 windows after success");
     }
@@ -499,7 +499,7 @@ mod tests {
         let cache = empty_cache();
         let (state, _) = super::do_fetch(
             ok_creds(),
-            &|_| Ok(valid_body().to_string()),
+            &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())),
             &cache,
             Some("a@b.com (pro)".to_string()),
         );
@@ -514,7 +514,7 @@ mod tests {
         let cache = empty_cache();
         let (state, _) = super::do_fetch(
             ok_creds(),
-            &|_| Ok(valid_body().to_string()),
+            &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())),
             &cache,
             None,
         );
@@ -533,7 +533,7 @@ mod tests {
         }]));
         let (state, _) = super::do_fetch(
             ok_creds(),
-            &|_| Err(HttpError::RateLimited),
+            &|_| (Err(HttpError::RateLimited), None),
             &cache,
             Some("a@b.com (pro)".to_string()),
         );
