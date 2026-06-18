@@ -44,16 +44,30 @@ pub fn format_all() -> String;
 // In src/diag.rs (macro_rules!, exported with #[macro_export])
 macro_rules! diag {
     ($lvl:expr, $($arg:tt)*) => {
-        $crate::diag::push($lvl, format!($($arg)*))
+        $crate::diag::push($lvl, format!("[{}:{}] {}", file!(), line!(), format!($($arg)*)))
     };
 }
 ```
+
+`file!()` and `line!()` are injected automatically — callers never write them manually.
 
 Usage anywhere in the codebase:
 ```rust
 use crate::diag::Level;
 diag!(Level::Err, "Claude parse error: {}", e);
 diag!(Level::Info, "Last OK: 5h {}% · 7d {}%", a, b);
+// produces: [src/provider/claude.rs:87] Claude parse error: invalid type: null…
+```
+
+**At every error site, the message must be specific and actionable** — include what operation was attempted, what the error was, and any relevant values (URL, status code, account name). Vague messages like "fetch failed" are not acceptable. Prefer `inspect_err` at call sites over putting logging on error types (error types lack call-site context):
+
+```rust
+// preferred
+fetch(url)
+    .inspect_err(|e| diag!(Level::Err, "Claude usage fetch failed ({}): {}", url, e))
+
+// avoid — HttpError doesn't know the URL or which provider called it
+impl HttpError { fn log_diag(&self) { … } }
 ```
 
 ### Entry format
@@ -146,6 +160,26 @@ pb.setString_forType(&NSString::from_str(&diag::format_all()), NSPasteboardTypeS
 
 Menu is rebuilt on every poll cycle (existing pattern). `is_empty()` check on each
 rebuild controls Diagnostics visibility. No extra state needed.
+
+---
+
+## README — Troubleshooting section
+
+The README must include a **Troubleshooting** section explaining:
+
+- When something is wrong, the menu shows an error message in the affected provider row.
+- Open **Other ▶ Diagnostics ▶ Copy diagnostic log** to copy the full log to clipboard.
+- The Diagnostics submenu is hidden when there is nothing to report.
+- Paste the log into an email or GitHub issue when reporting a bug.
+
+Example copy in the README:
+```
+### Troubleshooting
+
+If a provider row shows an error, open **Other ▶ Diagnostics ▶ Copy diagnostic log**
+to copy the full diagnostic log to your clipboard. Paste it into a GitHub issue or email
+when reporting a bug. The submenu is hidden when there is nothing to report.
+```
 
 ---
 

@@ -5,7 +5,7 @@ status: backlog
 priority: Normal
 tags: [robustness, logging, ux, pre-1.0]
 created: 2026-06-17
-updated: 2026-06-17
+updated: 2026-06-18
 spec: specs/2026-06-17-diagnostic-log-design.md
 ---
 # Diagnostic log service + "Other" menu
@@ -25,3 +25,4 @@ log` (hidden when buffer empty). User copies to clipboard and pastes in TextEdit
   — makes error reporting actionable for end users before public release.
   Hook points v1: parse error + last-ok snapshot + HTTP errors + token load failure.
   Spec: docs/superpowers/specs/2026-06-17-diagnostic-log-design.md.
+- 2026-06-18: Spec updated — `diag!` macro now auto-injects `file!():line!()`, no manual work at call sites. Instrumentation sweep (adding `inspect_err`/`diag!` across all providers, http.rs, keychain.rs) split into a separate card (#45-instrumentation-sweep, post-1.0 candidate). This card covers infrastructure only: diag.rs service + menu + 3 Claude hook points. README must include a Troubleshooting section explaining how to access and share the diagnostic log — spec now contains the required copy and structure.
