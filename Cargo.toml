@@ -27,6 +27,12 @@ objc2-foundation = { version = "0.3", features = [
     "NSAttributedString",
 ] }
 
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
 [build-dependencies]
 vergen-git2 = "1"
 ab_glyph = "0.2"
