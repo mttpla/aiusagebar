@@ -259,6 +259,10 @@ impl UsageProvider for ClaudeProvider {
 
         (state, http_err)
     }
+
+    fn raw_json(&self) -> Option<String> {
+        None
+    }
 }
 
 #[cfg(test)]

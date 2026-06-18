@@ -39,6 +39,8 @@ pub trait UsageProvider: Send + Sync {
     /// Returns the usage state plus the raw HTTP error that caused it, if any.
     /// Only `RateLimited` and `ServerError` errors trigger backoff in the caller.
     fn fetch_with_http_error(&self) -> (UsageState, Option<crate::http::HttpError>);
+    #[expect(dead_code)]
+    fn raw_json(&self) -> Option<String>;
 }
 
 #[cfg(test)]
