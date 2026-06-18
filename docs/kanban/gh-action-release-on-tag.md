@@ -3,10 +3,10 @@ id: 37
 status: backlog
 priority: Normal
 blocked_by: [11, 36]
-tags: [release, ci, pre-1.0]
+tags: [release, ci, post-1.0]
 spec: superpowers/specs/2026-06-14-gh-action-release-design.md
 created: 2026-06-14
-updated: 2026-06-16
+updated: 2026-06-18
 ---
 # GitHub Action: tag-triggered DMG release
 
@@ -39,3 +39,4 @@ Add `.github/workflows/release.yml`. On `v*` tag push: build arm64 DMG (via `scr
 - 2026-06-14: Added `blocked_by: 36`. Reason: while preparing this spec, discovered that `cliff.toml:5` strips the `v` prefix from CHANGELOG headings (`## [0.2.0]`), but tag names carry it (`v0.2.0`). The workflow extracts the release body by matching `## [$TAG]` in `CHANGELOG.md`, so the heading must match the tag. Fix (drop `trim_start_matches` + backfill existing entry) was folded into #36 because it belongs to the release-pipeline coherence story. #37 now depends on #36 shipping first so the heading format matches at extraction time.
 - 2026-06-14: Tagged `pre-1.0`. Hard requirement for 1.0.0: without this Action, the 1.0 release would require the user to manually build and upload the DMG to a GitHub Release every time — too much friction for the actual ship event. Ship order before 1.0: #36 (release pipeline coherence) → #11 (DMG build script) → #37 (this card). #35 (notarization) stays post-1.0.
 - 2026-06-16: Scope reduced. #11 re-scoped to have release.sh do the full local release including `gh release create --draft` + binary upload (option A, no Apple secrets on GH runner). This card now covers only CI build verification on PRs — no tag-triggered release creation. Spec (`docs/superpowers/specs/2026-06-14-gh-action-release-design.md`) needs rewrite to match new scope. Priority downgraded from hard blocker to nice-to-have CI safety net. `blocked_by: [11, 36]` unchanged — still want those done first so the workflow references a stable build script.
+- 2026-06-18: Reclassified post-1.0. Manual shell release is sufficient for 1.0. CI action is a polish item.
