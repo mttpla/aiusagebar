@@ -150,10 +150,6 @@ impl crate::provider::UsageProvider for CopilotProvider {
             },
         )
     }
-
-    fn raw_json(&self) -> Option<String> {
-        None
-    }
 }
 
 #[cfg(test)]
