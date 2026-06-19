@@ -161,6 +161,7 @@ fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
 pub struct ClaudeProvider {
     last_ok: Mutex<Option<Vec<LimitWindow>>>,
     profile: Mutex<Option<ProfileData>>,
+    last_raw_json: Mutex<Option<String>>,
 }
 
 impl Default for ClaudeProvider {
@@ -168,6 +169,7 @@ impl Default for ClaudeProvider {
         Self {
             last_ok: Mutex::new(None),
             profile: Mutex::new(None),
+            last_raw_json: Mutex::new(None),
         }
     }
 }
@@ -185,6 +187,7 @@ fn do_fetch(
     creds: CredLoad,
     http: &dyn Fn(&str) -> GetResult,
     last_ok: &Mutex<Option<Vec<LimitWindow>>>,
+    last_raw_json: &Mutex<Option<String>>,
     profile_string: Option<String>,
 ) -> (UsageState, Option<HttpError>) {
     let creds = match creds {
@@ -196,7 +199,10 @@ fn do_fetch(
         let date = format_expiry_date(creds.expires_at_ms);
         return (UsageState::Stale(format!("Expired on {} — run: claude login", date)), None);
     }
-    let (result, _raw) = http(&creds.access_token);
+    let (result, raw) = http(&creds.access_token);
+    if let Some(body) = raw {
+        *last_raw_json.lock().unwrap() = Some(body);
+    }
     match result {
         Ok(body) => match parse_response(&body) {
             Ok(windows) => {
@@ -250,6 +256,7 @@ impl UsageProvider for ClaudeProvider {
             creds,
             &|token| crate::http::get(USAGE_URL, token, &[("User-Agent", ua)]),
             &self.last_ok,
+            &self.last_raw_json,
             profile_string,
         );
 
@@ -387,7 +394,7 @@ mod tests {
 
     #[test]
     fn do_fetch_not_configured() {
-        let (state, _) = super::do_fetch(CredLoad::NotConfigured, &|_| unreachable!(), &empty_cache(), None);
+        let (state, _) = super::do_fetch(CredLoad::NotConfigured, &|_| unreachable!(), &empty_cache(), &Mutex::new(None), None);
         assert_eq!(state, UsageState::NotConfigured);
     }
 
@@ -397,6 +404,7 @@ mod tests {
             CredLoad::Malformed("bad json".to_string()),
             &|_| unreachable!(),
             &empty_cache(),
+            &Mutex::new(None),
             None,
         );
         assert!(matches!(state, UsageState::Error(ref e) if e.contains("Malformed")));
@@ -408,7 +416,7 @@ mod tests {
             access_token: "tok".to_string(),
             expires_at_ms: 1_000,
         });
-        let (state, _) = super::do_fetch(creds, &|_| unreachable!(), &empty_cache(), None);
+        let (state, _) = super::do_fetch(creds, &|_| unreachable!(), &empty_cache(), &Mutex::new(None), None);
         assert!(matches!(state, UsageState::Stale(ref s) if s.contains("Expired on")));
     }
 
@@ -418,6 +426,7 @@ mod tests {
             ok_creds(),
             &|_| (Err(HttpError::Unauthorized), None),
             &empty_cache(),
+            &Mutex::new(None),
             None,
         );
         assert!(matches!(state, UsageState::Stale(ref s) if s.contains("Token rejected")));
@@ -429,6 +438,7 @@ mod tests {
             ok_creds(),
             &|_| (Err(HttpError::RateLimited), None),
             &empty_cache(),
+            &Mutex::new(None),
             None,
         );
         assert!(matches!(state, UsageState::Error(ref s) if s.contains("Rate limited")));
@@ -444,7 +454,7 @@ mod tests {
             resets_at: None,
             unlimited: false,
         }]));
-        let (state, _) = super::do_fetch(ok_creds(), &|_| (Err(HttpError::RateLimited), None), &cache, None);
+        let (state, _) = super::do_fetch(ok_creds(), &|_| (Err(HttpError::RateLimited), None), &cache, &Mutex::new(None), None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w[0].percent_used == Some(42.0)));
     }
 
@@ -454,6 +464,7 @@ mod tests {
             ok_creds(),
             &|_| (Ok("garbage".to_string()), Some("garbage".to_string())),
             &empty_cache(),
+            &Mutex::new(None),
             None,
         );
         assert!(matches!(state, UsageState::Error(ref s) if s.contains("Parse error")));
@@ -462,7 +473,7 @@ mod tests {
     #[test]
     fn do_fetch_200_valid_returns_ok_and_populates_cache() {
         let cache = empty_cache();
-        let (state, _) = super::do_fetch(ok_creds(), &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())), &cache, None);
+        let (state, _) = super::do_fetch(ok_creds(), &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())), &cache, &Mutex::new(None), None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w.len() == 2));
         assert_eq!(cache.lock().unwrap().as_ref().map(|v| v.len()), Some(2), "cache must be populated with 2 windows after success");
     }
@@ -501,6 +512,7 @@ mod tests {
             ok_creds(),
             &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())),
             &cache,
+            &Mutex::new(None),
             Some("a@b.com (pro)".to_string()),
         );
         assert!(
@@ -516,6 +528,7 @@ mod tests {
             ok_creds(),
             &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())),
             &cache,
+            &Mutex::new(None),
             None,
         );
         assert!(matches!(state, UsageState::Ok(_, None)));
@@ -535,6 +548,7 @@ mod tests {
             ok_creds(),
             &|_| (Err(HttpError::RateLimited), None),
             &cache,
+            &Mutex::new(None),
             Some("a@b.com (pro)".to_string()),
         );
         assert!(
@@ -542,5 +556,47 @@ mod tests {
                 if w[0].percent_used == Some(42.0) && p.as_deref() == Some("a@b.com (pro)")),
             "cached Ok must carry profile string on rate limit"
         );
+    }
+
+    #[test]
+    fn do_fetch_stores_raw_body_on_200() {
+        let raw_cache: Mutex<Option<String>> = Mutex::new(None);
+        let _ = super::do_fetch(
+            ok_creds(),
+            &|_| (Ok(valid_body().to_string()), Some(valid_body().to_string())),
+            &empty_cache(),
+            &raw_cache,
+            None,
+        );
+        assert_eq!(raw_cache.lock().unwrap().as_deref(), Some(valid_body()));
+    }
+
+    #[test]
+    fn do_fetch_stores_raw_body_on_401() {
+        let raw_cache: Mutex<Option<String>> = Mutex::new(None);
+        let _ = super::do_fetch(
+            ok_creds(),
+            &|_| (Err(HttpError::Unauthorized), Some(r#"{"error":"unauthorized"}"#.to_string())),
+            &empty_cache(),
+            &raw_cache,
+            None,
+        );
+        assert_eq!(
+            raw_cache.lock().unwrap().as_deref(),
+            Some(r#"{"error":"unauthorized"}"#)
+        );
+    }
+
+    #[test]
+    fn do_fetch_does_not_store_raw_on_network_error() {
+        let raw_cache: Mutex<Option<String>> = Mutex::new(None);
+        let _ = super::do_fetch(
+            ok_creds(),
+            &|_| (Err(HttpError::Other("connection refused".into())), None),
+            &empty_cache(),
+            &raw_cache,
+            None,
+        );
+        assert!(raw_cache.lock().unwrap().is_none());
     }
 }
