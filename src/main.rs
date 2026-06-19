@@ -143,12 +143,6 @@ impl ApplicationHandler for App {
                 let _ = std::process::Command::new("open").arg(CLAUDE_SETUP_URL).spawn();
             } else if self.id_setup_copilot.as_ref().is_some_and(|id| ev.id == *id) {
                 let _ = std::process::Command::new("open").arg(COPILOT_SETUP_URL).spawn();
-            } else if self.id_details_claude.as_ref().is_some_and(|id| ev.id == *id)
-                || self.id_details_copilot.as_ref().is_some_and(|id| ev.id == *id)
-            {
-                // Details window — full implementation in a later task.
-                // prepare_content will format the raw JSON response.
-                let _content = details::prepare_content(None);
             }
         }
 
