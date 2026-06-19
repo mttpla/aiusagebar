@@ -18,24 +18,27 @@ pub(crate) fn pct_label(pct: Option<f32>) -> String {
 }
 
 /// Returns the number of NSMenu items that `append_claude_section` will append:
-/// 1 header + 1 per window when `UsageState::Ok`.
+/// 1 header + 1 per window + 1 details when `UsageState::Ok`, else 1 header + 1 details.
 pub(crate) fn section_item_count(state: &UsageState) -> usize {
     match state {
-        UsageState::Ok(windows, _) => 1 + windows.len(),
-        _ => 1,
+        UsageState::Ok(windows, _) => 2 + windows.len(),
+        _ => 2,
     }
 }
 
-pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> Option<MenuId> {
+pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> (Option<MenuId>, MenuId) {
     if let UsageState::NotConfigured = state {
         let item = MenuItem::new(
             header_label(ProviderKind::Claude.display_name(), state),
             true,
             None,
         );
-        let id = item.id().clone();
+        let setup_id = item.id().clone();
         menu.append(&item).expect("menu append failed");
-        return Some(id);
+        let details = MenuItem::new("Details…", true, None);
+        let details_id = details.id().clone();
+        menu.append(&details).expect("menu append failed");
+        return (Some(setup_id), details_id);
     }
     super::append_label(menu, header_label(ProviderKind::Claude.display_name(), state));
     if let UsageState::Ok(windows, _) = state {
@@ -52,7 +55,10 @@ pub(crate) fn append_claude_section(menu: &Menu, state: &UsageState) -> Option<M
             );
         }
     }
-    None
+    let details = MenuItem::new("Details…", true, None);
+    let details_id = details.id().clone();
+    menu.append(&details).expect("menu append failed");
+    (None, details_id)
 }
 
 #[cfg(test)]
@@ -117,12 +123,12 @@ mod tests {
             ],
             Some("max".into()),
         );
-        assert_eq!(section_item_count(&state), 3); // 1 header + 2 windows
+        assert_eq!(section_item_count(&state), 4); // 1 header + 2 windows + 1 details
     }
 
     #[test]
     fn append_claude_section_count_not_configured() {
-        assert_eq!(section_item_count(&UsageState::NotConfigured), 1);
+        assert_eq!(section_item_count(&UsageState::NotConfigured), 2); // header + details
     }
 
 }

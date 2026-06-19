@@ -46,6 +46,8 @@ struct App {
     id_update: Option<tray_icon::menu::MenuId>,
     id_setup_claude: Option<tray_icon::menu::MenuId>,
     id_setup_copilot: Option<tray_icon::menu::MenuId>,
+    id_details_claude: Option<tray_icon::menu::MenuId>,
+    id_details_copilot: Option<tray_icon::menu::MenuId>,
     providers: Vec<Box<dyn UsageProvider>>,
     last_refreshed_at: Option<DateTime<Local>>,
     settings: Settings,
@@ -94,6 +96,8 @@ impl App {
         self.id_update = build.update;
         self.id_setup_claude = build.setup_claude;
         self.id_setup_copilot = build.setup_copilot;
+        self.id_details_claude = build.details_claude;
+        self.id_details_copilot = build.details_copilot;
         self.tray.set_menu(Some(Box::new(build.menu)));
         self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
         self.last_refreshed_at = Some(now);
@@ -139,6 +143,12 @@ impl ApplicationHandler for App {
                 let _ = std::process::Command::new("open").arg(CLAUDE_SETUP_URL).spawn();
             } else if self.id_setup_copilot.as_ref().is_some_and(|id| ev.id == *id) {
                 let _ = std::process::Command::new("open").arg(COPILOT_SETUP_URL).spawn();
+            } else if self.id_details_claude.as_ref().is_some_and(|id| ev.id == *id)
+                || self.id_details_copilot.as_ref().is_some_and(|id| ev.id == *id)
+            {
+                // Details window — full implementation in a later task.
+                // prepare_content will format the raw JSON response.
+                let _content = details::prepare_content(None);
             }
         }
 
@@ -204,6 +214,8 @@ fn main() {
         id_update: build.update,
         id_setup_claude: build.setup_claude,
         id_setup_copilot: build.setup_copilot,
+        id_details_claude: build.details_claude,
+        id_details_copilot: build.details_copilot,
         providers,
         last_refreshed_at: None,
         settings,

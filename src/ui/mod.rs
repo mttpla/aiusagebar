@@ -17,6 +17,8 @@ pub struct MenuBuild {
     pub update: Option<MenuId>,
     pub setup_claude: Option<MenuId>,
     pub setup_copilot: Option<MenuId>,
+    pub details_claude: Option<MenuId>,
+    pub details_copilot: Option<MenuId>,
 }
 
 pub(crate) struct MenuLayout {
@@ -86,13 +88,19 @@ pub fn build_menu(
 
     let mut setup_claude: Option<MenuId> = None;
     let mut setup_copilot: Option<MenuId> = None;
+    let mut details_claude: Option<MenuId> = None;
+    let mut details_copilot: Option<MenuId> = None;
     for (kind, state) in states {
         match kind {
             ProviderKind::Claude => {
-                setup_claude = claude::append_claude_section(&menu, state);
+                let (sc, dc) = claude::append_claude_section(&menu, state);
+                setup_claude = sc;
+                details_claude = Some(dc);
             }
             ProviderKind::Copilot => {
-                setup_copilot = copilot::append_copilot_section(&menu, state);
+                let (sc, dc) = copilot::append_copilot_section(&menu, state);
+                setup_copilot = sc;
+                details_copilot = Some(dc);
             }
         }
     }
@@ -113,6 +121,8 @@ pub fn build_menu(
         update: update_id,
         setup_claude,
         setup_copilot,
+        details_claude,
+        details_copilot,
     }
 }
 
@@ -141,8 +151,8 @@ mod tests {
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.header_indices[0].0, 0);
-        assert_eq!(layout.refresh_idx, 3);
-        assert_eq!(layout.quit_idx, 6);
+        assert_eq!(layout.refresh_idx, 4);
+        assert_eq!(layout.quit_idx, 7);
     }
 
     #[test]
@@ -184,10 +194,10 @@ mod tests {
         assert_eq!(layout.window_items.len(), 3);
         assert_eq!(layout.window_items[0].0, 1);
         assert_eq!(layout.window_items[1].0, 2);
-        assert_eq!(layout.window_items[2].0, 4);
+        assert_eq!(layout.window_items[2].0, 5);
         assert_eq!(layout.window_items[2].1.name, "monthly");
-        assert_eq!(layout.refresh_idx, 5);
-        assert_eq!(layout.quit_idx, 8);
+        assert_eq!(layout.refresh_idx, 7);
+        assert_eq!(layout.quit_idx, 10);
     }
 
     #[test]
@@ -207,9 +217,9 @@ mod tests {
         assert_eq!(layout.header_indices[0].0, 2);
         // window item was at 1, now at 3
         assert_eq!(layout.window_items[0].0, 3);
-        // refresh was at 2 (1 header + 1 window + footer), now at 4
-        assert_eq!(layout.refresh_idx, 4);
-        assert_eq!(layout.quit_idx, 7);
+        // refresh was at 3 (1 header + 1 window + 1 details + footer), now at 5
+        assert_eq!(layout.refresh_idx, 5);
+        assert_eq!(layout.quit_idx, 8);
     }
 
     #[test]
@@ -220,6 +230,6 @@ mod tests {
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.header_indices[0].0, 0);
-        assert_eq!(layout.refresh_idx, 2);
+        assert_eq!(layout.refresh_idx, 3);
     }
 }
