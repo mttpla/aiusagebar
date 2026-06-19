@@ -84,6 +84,6 @@ mod tests {
 
     #[test]
     fn get_returns_tuple() {
-        let _: fn(&str, &str, &[(&str, &str)]) -> (Result<String, super::HttpError>, Option<String>) = super::get;
+        let _: fn(&str, &str, &[(&str, &str)]) -> super::GetResult = super::get;
     }
 }
