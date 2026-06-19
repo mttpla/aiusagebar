@@ -154,6 +154,10 @@ impl crate::provider::UsageProvider for CopilotProvider {
         crate::provider::ProviderKind::Copilot
     }
 
+    fn raw_json(&self) -> Option<String> {
+        self.last_raw_json.lock().unwrap().clone()
+    }
+
     fn fetch_with_http_error(&self) -> (UsageState, Option<crate::http::HttpError>) {
         let (state, err, raw) = do_copilot_fetch(
             load_copilot_tokens(),

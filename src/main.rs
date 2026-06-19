@@ -143,6 +143,16 @@ impl ApplicationHandler for App {
                 let _ = std::process::Command::new("open").arg(CLAUDE_SETUP_URL).spawn();
             } else if self.id_setup_copilot.as_ref().is_some_and(|id| ev.id == *id) {
                 let _ = std::process::Command::new("open").arg(COPILOT_SETUP_URL).spawn();
+            } else if self.id_details_claude.as_ref().is_some_and(|id| ev.id == *id) {
+                let raw = self.providers.iter()
+                    .find(|p| p.kind() == crate::provider::ProviderKind::Claude)
+                    .and_then(|p| p.raw_json());
+                crate::details::show("Claude", raw.as_deref());
+            } else if self.id_details_copilot.as_ref().is_some_and(|id| ev.id == *id) {
+                let raw = self.providers.iter()
+                    .find(|p| p.kind() == crate::provider::ProviderKind::Copilot)
+                    .and_then(|p| p.raw_json());
+                crate::details::show("Copilot", raw.as_deref());
             }
         }
 

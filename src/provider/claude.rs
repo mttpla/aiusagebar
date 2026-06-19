@@ -232,6 +232,10 @@ fn do_fetch(
 impl UsageProvider for ClaudeProvider {
     fn kind(&self) -> crate::provider::ProviderKind { crate::provider::ProviderKind::Claude }
 
+    fn raw_json(&self) -> Option<String> {
+        self.last_raw_json.lock().unwrap().clone()
+    }
+
     fn fetch_with_http_error(&self) -> (UsageState, Option<HttpError>) {
         let ua = get_user_agent();
         let creds = load_credentials();
