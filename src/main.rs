@@ -1,4 +1,5 @@
 mod backoff;
+mod details;
 mod http;
 mod icon;
 mod keychain;
