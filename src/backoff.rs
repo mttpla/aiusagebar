@@ -15,6 +15,7 @@ impl BackoffState {
 
     pub fn on_success(&mut self, base: Duration) {
         self.current_interval = base;
+        self.next_allowed_at = Instant::now() + base;
     }
 
     pub fn on_error(&mut self, factor: u32, cap: Duration) {
@@ -44,6 +45,14 @@ mod tests {
         s.on_error(2, cap);
         s.on_success(base);
         assert_eq!(s.current_interval, base);
+    }
+
+    #[test]
+    fn on_success_advances_next_allowed_at() {
+        let base = Duration::from_secs(300);
+        let mut s = BackoffState::new(base);
+        s.on_success(base);
+        assert!(!s.is_allowed(), "next poll must be in the future after on_success");
     }
 
     #[test]
