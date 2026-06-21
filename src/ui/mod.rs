@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn menu_layout_indices_no_providers() {
-        // Refresh(0) + sep(1) + About(2) + Quit(3)
+        // Other(0) + Refresh(1) + sep(2) + About(3) + Quit(4)
         let layout = build_layout(&[], None, None);
         assert_eq!(layout.refresh_idx, 1);
         assert_eq!(layout.quit_idx, 4);

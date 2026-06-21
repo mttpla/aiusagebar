@@ -9,7 +9,9 @@ pub fn copy(text: &str) {
         let pb = NSPasteboard::generalPasteboard();
         pb.clearContents();
         let ns = NSString::from_str(text);
-        pb.setString_forType(&ns, NSPasteboardTypeString);
+        if !pb.setString_forType(&ns, NSPasteboardTypeString) {
+            crate::diag!(crate::diag::Level::Err, "NSPasteboard write failed");
+        }
     }
 }
 

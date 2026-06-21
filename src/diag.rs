@@ -49,15 +49,35 @@ fn format_entry(time: &str, level: Level, message: &str) -> String {
     format!("[{} {}] {}", time, level.label(), message)
 }
 
-pub fn push(level: Level, msg: impl Into<String>) {
-    let message = truncate(&msg.into(), MAX_MSG_BYTES);
-    let time = chrono::Local::now().format("%H:%M:%S").to_string();
-    let entry = Entry { time, level, message };
-    let mut buf = buffer().lock().unwrap();
+/// Builds an entry, truncating its message to the per-message byte cap.
+fn make_entry(level: Level, msg: String, time: String) -> Entry {
+    Entry {
+        time,
+        level,
+        message: truncate(&msg, MAX_MSG_BYTES),
+    }
+}
+
+/// Appends `entry`, evicting the oldest when at capacity. Operates on a passed
+/// buffer so the capacity logic is testable without the process-global state.
+fn push_entry(buf: &mut VecDeque<Entry>, entry: Entry) {
     if buf.len() == CAPACITY {
         buf.pop_front();
     }
     buf.push_back(entry);
+}
+
+fn format_buf(buf: &VecDeque<Entry>) -> String {
+    buf.iter()
+        .map(|e| format_entry(&e.time, e.level, &e.message))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn push(level: Level, msg: impl Into<String>) {
+    let time = chrono::Local::now().format("%H:%M:%S").to_string();
+    let entry = make_entry(level, msg.into(), time);
+    push_entry(&mut buffer().lock().unwrap(), entry);
 }
 
 pub fn is_empty() -> bool {
@@ -65,11 +85,7 @@ pub fn is_empty() -> bool {
 }
 
 pub fn format_all() -> String {
-    let buf = buffer().lock().unwrap();
-    buf.iter()
-        .map(|e| format_entry(&e.time, e.level, &e.message))
-        .collect::<Vec<_>>()
-        .join("\n")
+    format_buf(&buffer().lock().unwrap())
 }
 
 /// Pushes a diagnostic entry, auto-injecting the call-site `file!():line!()`.
@@ -77,7 +93,7 @@ pub fn format_all() -> String {
 #[macro_export]
 macro_rules! diag {
     ($lvl:expr, $($arg:tt)*) => {
-        $crate::diag::push($lvl, format!("[{}:{}] {}", file!(), line!(), format!($($arg)*)))
+        $crate::diag::push($lvl, format!("[{}:{}] {}", file!(), line!(), format_args!($($arg)*)))
     };
 }
 
@@ -118,24 +134,31 @@ mod tests {
         assert!(format_entry("00:00:00", Level::Info, "x").contains("INF"));
     }
 
-    // Single test that mutates the global buffer, to avoid cross-test races.
     #[test]
-    fn push_is_empty_capacity_and_format_all() {
-        assert!(is_empty(), "buffer must start empty in a fresh test process");
-        push(Level::Err, "first");
-        assert!(!is_empty());
-        let all = format_all();
-        assert!(all.contains("first"), "got: {all}");
-        assert!(all.contains("ERR"), "got: {all}");
+    fn make_entry_truncates_message() {
+        let e = make_entry(Level::Err, "a".repeat(3000), "12:00:00".to_string());
+        assert!(e.message.ends_with("… (truncated)"));
+        assert!(e.message.len() <= MAX_MSG_BYTES + "… (truncated)".len());
+    }
 
-        // Overflow capacity: push 120 more, oldest must be evicted.
+    // Capacity + formatting tested on a local buffer to avoid races on the
+    // process-global static (other tests push to it in parallel).
+    #[test]
+    fn push_entry_caps_at_capacity_and_evicts_oldest() {
+        let mut buf = VecDeque::new();
         for i in 0..120 {
-            push(Level::Info, format!("entry {i}"));
+            push_entry(&mut buf, make_entry(Level::Info, format!("entry {i}"), "t".to_string()));
         }
-        let all = format_all();
-        let line_count = all.lines().count();
-        assert_eq!(line_count, 100, "buffer must cap at 100 lines, got {line_count}");
-        assert!(!all.contains("first"), "oldest entry must be evicted");
+        assert_eq!(buf.len(), CAPACITY, "buffer must cap at {CAPACITY}");
+        let all = format_buf(&buf);
+        assert_eq!(all.lines().count(), CAPACITY);
+        assert!(!all.contains("entry 0"), "oldest entry must be evicted");
         assert!(all.contains("entry 119"), "newest entry must be present");
+        assert!(all.contains("INF"), "level label must be present");
+    }
+
+    #[test]
+    fn format_buf_empty_is_empty_string() {
+        assert_eq!(format_buf(&VecDeque::new()), "");
     }
 }
