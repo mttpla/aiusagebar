@@ -52,7 +52,7 @@ fn uid() -> Result<u32, String> {
 }
 
 #[cfg(debug_assertions)]
-pub fn enable() -> Result<(), String> {
+pub(crate) fn enable() -> Result<(), String> {
     eprintln!("[launch_at_login] skipped in debug build");
     Ok(())
 }
@@ -62,7 +62,7 @@ const LAUNCHCTL_ALREADY_LOADED: i32 = 36;
 const LAUNCHCTL_NOT_LOADED: i32 = 3;
 
 #[cfg(not(debug_assertions))]
-pub fn enable() -> Result<(), String> {
+pub(crate) fn enable() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let binary = exe.to_str().ok_or("non-UTF8 binary path")?;
     let plist = plist_path().ok_or("no home directory")?;
@@ -91,7 +91,7 @@ pub fn enable() -> Result<(), String> {
 }
 
 #[allow(dead_code)]
-pub fn disable() -> Result<(), String> {
+pub(crate) fn disable() -> Result<(), String> {
     let uid = uid()?;
     let out = std::process::Command::new("launchctl")
         .args(["bootout", &format!("gui/{uid}/{LABEL}")])
@@ -111,7 +111,7 @@ pub fn disable() -> Result<(), String> {
 }
 
 #[allow(dead_code)]
-pub fn is_enabled() -> bool {
+pub(crate) fn is_enabled() -> bool {
     plist_path().map(|p| p.exists()).unwrap_or(false)
 }
 

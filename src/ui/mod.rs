@@ -1,33 +1,33 @@
 use tray_icon::menu::{Menu, MenuId, MenuItem};
 use crate::provider::{LimitWindow, ProviderKind, UsageState};
 
-pub mod base;
-pub mod claude;
-pub mod copilot;
+pub(crate) mod base;
+pub(crate) mod claude;
+pub(crate) mod copilot;
 pub(crate) mod time;
 
 #[cfg(target_os = "macos")]
 pub(crate) mod styled;
 
-pub struct MenuBuild {
-    pub menu: Menu,
-    pub about: MenuId,
-    pub refresh: MenuId,
-    pub quit: MenuId,
-    pub update: Option<MenuId>,
-    pub setup_claude: Option<MenuId>,
-    pub setup_copilot: Option<MenuId>,
-    pub details_claude: Option<MenuId>,
-    pub details_copilot: Option<MenuId>,
-    pub copy_diag: Option<MenuId>,
+pub(crate) struct MenuBuild {
+    pub(crate) menu: Menu,
+    pub(crate) about: MenuId,
+    pub(crate) refresh: MenuId,
+    pub(crate) quit: MenuId,
+    pub(crate) update: Option<MenuId>,
+    pub(crate) setup_claude: Option<MenuId>,
+    pub(crate) setup_copilot: Option<MenuId>,
+    pub(crate) details_claude: Option<MenuId>,
+    pub(crate) details_copilot: Option<MenuId>,
+    pub(crate) copy_diag: Option<MenuId>,
 }
 
 pub(crate) struct MenuLayout {
-    pub header_indices: Vec<(usize, ProviderKind)>,
-    pub window_items: Vec<(usize, LimitWindow)>,
-    pub refresh_idx: usize,
-    pub quit_idx: usize,
-    pub last_updated: Option<String>,
+    pub(crate) header_indices: Vec<(usize, ProviderKind)>,
+    pub(crate) window_items: Vec<(usize, LimitWindow)>,
+    pub(crate) refresh_idx: usize,
+    pub(crate) quit_idx: usize,
+    pub(crate) last_updated: Option<String>,
 }
 
 /// Pure index-tracking function — does NOT build the actual Menu.
@@ -70,7 +70,7 @@ pub(crate) fn append_label(menu: &Menu, text: impl Into<String>) {
         .expect("menu append failed");
 }
 
-pub fn build_menu(
+pub(crate) fn build_menu(
     states: &[(ProviderKind, &UsageState)],
     last_updated: Option<&str>,
     update: Option<&str>,

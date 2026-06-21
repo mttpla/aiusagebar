@@ -5,7 +5,7 @@ const CAPACITY: usize = 100;
 const MAX_MSG_BYTES: usize = 2048;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Level {
+pub(crate) enum Level {
     Err,
     Info,
 }
@@ -34,7 +34,7 @@ fn buffer() -> &'static Mutex<VecDeque<Entry>> {
 
 /// Truncates `s` to at most `max_bytes`, respecting char boundaries, appending
 /// "… (truncated)" when truncation occurs.
-pub fn truncate(s: &str, max_bytes: usize) -> String {
+pub(crate) fn truncate(s: &str, max_bytes: usize) -> String {
     if s.len() <= max_bytes {
         return s.to_string();
     }
@@ -74,17 +74,17 @@ fn format_buf(buf: &VecDeque<Entry>) -> String {
         .join("\n")
 }
 
-pub fn push(level: Level, msg: impl Into<String>) {
+pub(crate) fn push(level: Level, msg: impl Into<String>) {
     let time = chrono::Local::now().format("%H:%M:%S").to_string();
     let entry = make_entry(level, msg.into(), time);
     push_entry(&mut buffer().lock().unwrap(), entry);
 }
 
-pub fn is_empty() -> bool {
+pub(crate) fn is_empty() -> bool {
     buffer().lock().unwrap().is_empty()
 }
 
-pub fn format_all() -> String {
+pub(crate) fn format_all() -> String {
     format_buf(&buffer().lock().unwrap())
 }
 

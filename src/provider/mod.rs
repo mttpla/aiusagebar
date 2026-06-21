@@ -1,18 +1,18 @@
-pub mod claude;
-pub mod copilot;
+pub(crate) mod claude;
+pub(crate) mod copilot;
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct LimitWindow {
-    pub name: String,
-    pub percent_used: Option<f32>,
-    pub limit: Option<u32>,
-    pub remaining: Option<u32>,
-    pub resets_at: Option<String>,
-    pub unlimited: bool,
+pub(crate) struct LimitWindow {
+    pub(crate) name: String,
+    pub(crate) percent_used: Option<f32>,
+    pub(crate) limit: Option<u32>,
+    pub(crate) remaining: Option<u32>,
+    pub(crate) resets_at: Option<String>,
+    pub(crate) unlimited: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UsageState {
+pub(crate) enum UsageState {
     NotConfigured,
     Stale(String),
     Ok(Vec<LimitWindow>, Option<String>),
@@ -20,13 +20,13 @@ pub enum UsageState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ProviderKind {
+pub(crate) enum ProviderKind {
     Claude,
     Copilot,
 }
 
 impl ProviderKind {
-    pub fn display_name(&self) -> &'static str {
+    pub(crate) fn display_name(&self) -> &'static str {
         match self {
             ProviderKind::Claude => "Claude",
             ProviderKind::Copilot => "Copilot",
@@ -34,7 +34,7 @@ impl ProviderKind {
     }
 }
 
-pub trait UsageProvider: Send + Sync {
+pub(crate) trait UsageProvider: Send + Sync {
     fn kind(&self) -> ProviderKind;
     /// Returns the usage state plus the raw HTTP error that caused it, if any.
     /// Only `RateLimited` and `ServerError` errors trigger backoff in the caller.

@@ -1,14 +1,14 @@
 use crate::provider::UsageState;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum IconKind {
+pub(crate) enum IconKind {
     Normal,
     Alert,
     Unavailable,
 }
 
 impl IconKind {
-    pub fn for_state(state: &UsageState, threshold: f32) -> Self {
+    pub(crate) fn for_state(state: &UsageState, threshold: f32) -> Self {
         match state {
             UsageState::Ok(windows, _) => {
                 if windows.iter().any(|w| w.percent_used.unwrap_or(0.0) >= threshold) {
@@ -21,7 +21,7 @@ impl IconKind {
         }
     }
 
-    pub fn for_providers(states: &[&UsageState], threshold: f32) -> Self {
+    pub(crate) fn for_providers(states: &[&UsageState], threshold: f32) -> Self {
         states.iter().fold(IconKind::Normal, |best, s| {
             match (best, IconKind::for_state(s, threshold)) {
                 (IconKind::Alert, _) | (_, IconKind::Alert) => IconKind::Alert,
@@ -36,14 +36,14 @@ static ICON_NORMAL_PNG: &[u8] = include_bytes!("../icons/brain_normal.png");
 static ICON_ALERT_PNG: &[u8] = include_bytes!("../icons/brain_alert.png");
 static ICON_UNAVAILABLE_PNG: &[u8] = include_bytes!("../icons/brain_unavailable.png");
 
-pub struct Icons {
+pub(crate) struct Icons {
     normal: tray_icon::Icon,
     alert: tray_icon::Icon,
     unavailable: tray_icon::Icon,
 }
 
 impl Icons {
-    pub fn load() -> Self {
+    pub(crate) fn load() -> Self {
         Self {
             normal: parse(ICON_NORMAL_PNG),
             alert: parse(ICON_ALERT_PNG),
@@ -51,7 +51,7 @@ impl Icons {
         }
     }
 
-    pub fn get(&self, kind: IconKind) -> tray_icon::Icon {
+    pub(crate) fn get(&self, kind: IconKind) -> tray_icon::Icon {
         match kind {
             IconKind::Normal => self.normal.clone(),
             IconKind::Alert => self.alert.clone(),

@@ -1,4 +1,4 @@
-pub fn format_version(cargo: &str, git: &str) -> String {
+pub(crate) fn format_version(cargo: &str, git: &str) -> String {
     let git = git.strip_prefix('v').unwrap_or(git);
     if git.starts_with(cargo) {
         git.to_string()
@@ -7,7 +7,7 @@ pub fn format_version(cargo: &str, git: &str) -> String {
     }
 }
 
-pub fn app_version() -> String {
+pub(crate) fn app_version() -> String {
     format_version(env!("CARGO_PKG_VERSION"), env!("VERGEN_GIT_DESCRIBE"))
 }
 

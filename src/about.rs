@@ -5,7 +5,7 @@ const START_YEAR: i32 = 2026;
 #[cfg(target_os = "macos")]
 const ABOUT_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/about-icon.png"));
 
-pub fn copyright_year_str(current_year: i32) -> String {
+pub(crate) fn copyright_year_str(current_year: i32) -> String {
     if current_year == START_YEAR {
         START_YEAR.to_string()
     } else {
@@ -13,14 +13,14 @@ pub fn copyright_year_str(current_year: i32) -> String {
     }
 }
 
-pub fn is_italian() -> bool {
+pub(crate) fn is_italian() -> bool {
     std::env::var("LANG")
         .unwrap_or_default()
         .to_lowercase()
         .starts_with("it")
 }
 
-pub fn body_text(copyright_year: &str, italian: bool) -> String {
+pub(crate) fn body_text(copyright_year: &str, italian: bool) -> String {
     let tagline = if italian {
         "Monitor in sola lettura. Non invia prompt, non consuma quota, non modifica credenziali."
     } else {
@@ -38,7 +38,7 @@ pub fn body_text(copyright_year: &str, italian: bool) -> String {
 }
 
 #[cfg(target_os = "macos")]
-pub fn show() {
+pub(crate) fn show() {
     use chrono::Local;
     use objc2::{AnyThread, MainThreadMarker};
     use objc2_app_kit::{NSAlert, NSAlertSecondButtonReturn, NSImage, NSTextField, NSTextAlignment};

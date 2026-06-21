@@ -1,4 +1,4 @@
-pub fn show(provider_name: &str, raw_json: Option<&str>) {
+pub(crate) fn show(provider_name: &str, raw_json: Option<&str>) {
     use objc2::{MainThreadMarker, MainThreadOnly};
     use objc2_app_kit::{NSAlert, NSFont, NSScrollView, NSTextView};
     use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
@@ -23,7 +23,7 @@ pub fn show(provider_name: &str, raw_json: Option<&str>) {
     alert.runModal();
 }
 
-pub fn prepare_content(raw_json: Option<&str>) -> String {
+pub(crate) fn prepare_content(raw_json: Option<&str>) -> String {
     match raw_json {
         None => "No data yet".to_string(),
         Some(body) => serde_json::from_str::<serde_json::Value>(body)
