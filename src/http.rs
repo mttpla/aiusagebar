@@ -35,7 +35,10 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> (Result<St
     }
     let resp = match req.call() {
         Ok(r) => r,
-        Err(e) => return (Err(HttpError::Other(e.to_string())), None),
+        Err(e) => {
+            crate::diag!(crate::diag::Level::Err, "HTTP request to {} failed: {}", url, e);
+            return (Err(HttpError::Other(e.to_string())), None);
+        }
     };
     let status = resp.status().as_u16();
     let raw = resp.into_body().read_to_string().ok();
@@ -46,6 +49,15 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> (Result<St
         c @ 500..=599 => Err(HttpError::ServerError(c)),
         code => Err(HttpError::Other(format!("HTTP {}", code))),
     };
+    if result.is_err() {
+        crate::diag!(
+            crate::diag::Level::Err,
+            "HTTP {} from {}: {}",
+            status,
+            url,
+            crate::diag::truncate(raw.as_deref().unwrap_or(""), 512)
+        );
+    }
     (result, raw)
 }
 

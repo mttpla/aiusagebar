@@ -19,6 +19,7 @@ pub struct MenuBuild {
     pub setup_copilot: Option<MenuId>,
     pub details_claude: Option<MenuId>,
     pub details_copilot: Option<MenuId>,
+    pub copy_diag: Option<MenuId>,
 }
 
 pub(crate) struct MenuLayout {
@@ -53,12 +54,13 @@ pub(crate) fn build_layout(
         };
     }
 
-    // Footer layout: Refresh(idx), separator(idx+1), About(idx+2), Quit(idx+3)
+    // "Other" submenu (always present) sits at `idx`; the footer follows it.
+    // Footer: Refresh(idx+1), separator(idx+2), About(idx+3), Quit(idx+4)
     MenuLayout {
         header_indices,
         window_items,
-        refresh_idx: idx,
-        quit_idx: idx + 3,
+        refresh_idx: idx + 1,
+        quit_idx: idx + 4,
         last_updated: last_updated.map(str::to_owned),
     }
 }
@@ -104,6 +106,7 @@ pub fn build_menu(
             }
         }
     }
+    let copy_diag = base::append_other(&menu);
     let footer = base::append_footer(&menu);
     let layout = build_layout(states, last_updated, update);
 
@@ -123,6 +126,7 @@ pub fn build_menu(
         setup_copilot,
         details_claude,
         details_copilot,
+        copy_diag,
     }
 }
 
@@ -135,8 +139,8 @@ mod tests {
     fn menu_layout_indices_no_providers() {
         // Refresh(0) + sep(1) + About(2) + Quit(3)
         let layout = build_layout(&[], None, None);
-        assert_eq!(layout.refresh_idx, 0);
-        assert_eq!(layout.quit_idx, 3);
+        assert_eq!(layout.refresh_idx, 1);
+        assert_eq!(layout.quit_idx, 4);
         assert!(layout.header_indices.is_empty());
     }
 
@@ -151,8 +155,8 @@ mod tests {
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.header_indices[0].0, 0);
-        assert_eq!(layout.refresh_idx, 4);
-        assert_eq!(layout.quit_idx, 7);
+        assert_eq!(layout.refresh_idx, 5);
+        assert_eq!(layout.quit_idx, 8);
     }
 
     #[test]
@@ -196,8 +200,8 @@ mod tests {
         assert_eq!(layout.window_items[1].0, 2);
         assert_eq!(layout.window_items[2].0, 5);
         assert_eq!(layout.window_items[2].1.name, "monthly");
-        assert_eq!(layout.refresh_idx, 7);
-        assert_eq!(layout.quit_idx, 10);
+        assert_eq!(layout.refresh_idx, 8);
+        assert_eq!(layout.quit_idx, 11);
     }
 
     #[test]
@@ -217,9 +221,9 @@ mod tests {
         assert_eq!(layout.header_indices[0].0, 2);
         // window item was at 1, now at 3
         assert_eq!(layout.window_items[0].0, 3);
-        // refresh was at 3 (1 header + 1 window + 1 details + footer), now at 5
-        assert_eq!(layout.refresh_idx, 5);
-        assert_eq!(layout.quit_idx, 8);
+        // refresh was at 3 without Other/update; +1 Other +2 update = 6
+        assert_eq!(layout.refresh_idx, 6);
+        assert_eq!(layout.quit_idx, 9);
     }
 
     #[test]
@@ -230,6 +234,6 @@ mod tests {
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.header_indices[0].0, 0);
-        assert_eq!(layout.refresh_idx, 3);
+        assert_eq!(layout.refresh_idx, 4);
     }
 }

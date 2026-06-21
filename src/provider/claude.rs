@@ -158,6 +158,17 @@ fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
     ])
 }
 
+fn last_ok_summary(windows: &[LimitWindow]) -> String {
+    windows
+        .iter()
+        .map(|w| match w.percent_used {
+            Some(p) => format!("{} {:.0}%", w.name, p),
+            None => format!("{} —", w.name),
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
 pub struct ClaudeProvider {
     last_ok: Mutex<Option<Vec<LimitWindow>>>,
     profile: Mutex<Option<ProfileData>>,
@@ -192,7 +203,10 @@ fn do_fetch(
 ) -> (UsageState, Option<HttpError>) {
     let creds = match creds {
         CredLoad::NotConfigured => return (UsageState::NotConfigured, None),
-        CredLoad::Malformed(e) => return (UsageState::Error(format!("Malformed credentials: {}", e)), None),
+        CredLoad::Malformed(e) => {
+            crate::diag!(crate::diag::Level::Err, "Claude credentials malformed: {}", e);
+            return (UsageState::Error(format!("Malformed credentials: {}", e)), None);
+        }
         CredLoad::Ok(c) => c,
     };
     if is_expired(creds.expires_at_ms) {
@@ -210,7 +224,14 @@ fn do_fetch(
                 *last_ok.lock().unwrap() = Some(windows.clone());
                 (UsageState::Ok(windows, profile_string), None)
             }
-            Err(e) => (UsageState::Error(format!("Parse error: {}", e)), None),
+            Err(e) => {
+                crate::diag!(crate::diag::Level::Err, "Claude parse error: {}", e);
+                if let Some(windows) = last_ok.lock().unwrap().as_ref() {
+                    crate::diag!(crate::diag::Level::Info, "Last OK: {}", last_ok_summary(windows));
+                }
+                crate::diag!(crate::diag::Level::Err, "Raw body: {}", crate::diag::truncate(&body, 2048));
+                (UsageState::Error(format!("Parse error: {}", e)), None)
+            }
         },
         Err(HttpError::Unauthorized) => {
             (UsageState::Stale("Token rejected — run: claude login".to_string()), Some(HttpError::Unauthorized))
@@ -310,6 +331,23 @@ mod tests {
         assert_eq!(bytes.len(), 10, "got {s}");
         assert_eq!(bytes[4], b'-');
         assert_eq!(bytes[7], b'-');
+    }
+
+    #[test]
+    fn last_ok_summary_formats_each_window() {
+        let windows = vec![
+            LimitWindow { name: "5h session".to_string(), percent_used: Some(42.0), ..Default::default() },
+            LimitWindow { name: "7d weekly".to_string(), percent_used: Some(18.0), ..Default::default() },
+        ];
+        assert_eq!(super::last_ok_summary(&windows), "5h session 42% · 7d weekly 18%");
+    }
+
+    #[test]
+    fn last_ok_summary_handles_missing_percent() {
+        let windows = vec![
+            LimitWindow { name: "5h session".to_string(), percent_used: None, ..Default::default() },
+        ];
+        assert_eq!(super::last_ok_summary(&windows), "5h session —");
     }
 
     #[test]

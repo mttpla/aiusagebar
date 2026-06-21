@@ -1,4 +1,4 @@
-use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu};
 
 pub(crate) struct FooterIds {
     pub refresh: MenuId,
@@ -21,4 +21,26 @@ pub(crate) fn append_footer(menu: &Menu) -> FooterIds {
         about: item_about.id().clone(),
         quit: item_quit.id().clone(),
     }
+}
+
+/// Appends the always-visible "Other ▶" submenu. When the diagnostic log has
+/// entries it contains "Diagnostics ▶ Copy diagnostic log" and returns the copy
+/// item's id; when empty it shows a disabled "No diagnostics" placeholder and
+/// returns None.
+pub(crate) fn append_other(menu: &Menu) -> Option<MenuId> {
+    let other = Submenu::new("Other", true);
+    let copy_id = if crate::diag::is_empty() {
+        let placeholder = MenuItem::new("No diagnostics", false, None);
+        other.append(&placeholder).expect("menu append failed");
+        None
+    } else {
+        let diagnostics = Submenu::new("Diagnostics", true);
+        let copy = MenuItem::new("Copy diagnostic log", true, None);
+        let id = copy.id().clone();
+        diagnostics.append(&copy).expect("menu append failed");
+        other.append(&diagnostics).expect("menu append failed");
+        Some(id)
+    };
+    menu.append(&other).expect("menu append failed");
+    copy_id
 }

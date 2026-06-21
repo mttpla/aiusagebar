@@ -1,4 +1,6 @@
 mod backoff;
+mod diag;
+mod clipboard;
 mod details;
 mod http;
 mod icon;
@@ -48,6 +50,7 @@ struct App {
     id_setup_copilot: Option<tray_icon::menu::MenuId>,
     id_details_claude: Option<tray_icon::menu::MenuId>,
     id_details_copilot: Option<tray_icon::menu::MenuId>,
+    id_copy_diag: Option<tray_icon::menu::MenuId>,
     providers: Vec<Box<dyn UsageProvider>>,
     last_refreshed_at: Option<DateTime<Local>>,
     settings: Settings,
@@ -96,6 +99,7 @@ impl App {
         self.id_setup_copilot = build.setup_copilot;
         self.id_details_claude = build.details_claude;
         self.id_details_copilot = build.details_copilot;
+        self.id_copy_diag = build.copy_diag;
         self.tray.set_menu(Some(Box::new(build.menu)));
         self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
         self.last_refreshed_at = Some(now);
@@ -151,6 +155,8 @@ impl ApplicationHandler for App {
                     .find(|p| p.kind() == crate::provider::ProviderKind::Copilot)
                     .and_then(|p| p.raw_json());
                 crate::details::show("Copilot", raw.as_deref());
+            } else if self.id_copy_diag.as_ref().is_some_and(|id| ev.id == *id) {
+                crate::clipboard::copy(&crate::diag::format_all());
             }
         }
 
@@ -218,6 +224,7 @@ fn main() {
         id_setup_copilot: build.setup_copilot,
         id_details_claude: build.details_claude,
         id_details_copilot: build.details_copilot,
+        id_copy_diag: build.copy_diag,
         providers,
         last_refreshed_at: None,
         settings,

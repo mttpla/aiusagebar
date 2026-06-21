@@ -21,7 +21,7 @@ objc2-app-kit = { version = "0.3", features = [
     "NSAlert", "NSTextField", "NSControl", "NSView", "NSText",
     "NSColor", "NSFont", "NSMenu", "NSMenuItem",
     "NSParagraphStyle", "NSAttributedString", "NSImage",
-    "NSBox", "NSScrollView", "NSTextView",
+    "NSBox", "NSScrollView", "NSTextView", "NSPasteboard",
 ] }
 objc2-foundation = { version = "0.3", features = [
     "NSAttributedString",
