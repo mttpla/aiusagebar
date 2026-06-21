@@ -73,10 +73,10 @@ impl App {
             let b = self.backoff.get_mut(&kind).expect("backoff entry missing");
             match http_err {
                 Some(HttpError::RateLimited | HttpError::ServerError(_)) => {
-                    b.on_error(self.settings.backoff_factor, self.settings.backoff_cap);
+                    b.on_error();
                 }
                 _ => {
-                    b.on_success(self.settings.poll_interval);
+                    b.on_success();
                 }
             }
             states.push((kind, state));
@@ -162,7 +162,7 @@ impl ApplicationHandler for App {
 
         let _ = TrayIconEvent::receiver().try_recv();
         let next_provider = self.backoff.values()
-            .map(|b| b.next_allowed_at)
+            .map(|b| b.next_allowed_at())
             .min()
             .unwrap_or_else(|| Instant::now() + self.settings.poll_interval);
         let update_deadline = self.next_update_check_after
@@ -210,7 +210,7 @@ fn main() {
     let settings = Settings::default();
     let backoff: HashMap<ProviderKind, BackoffState> = providers
         .iter()
-        .map(|p| (p.kind(), BackoffState::new(settings.poll_interval)))
+        .map(|p| (p.kind(), BackoffState::new(settings.poll_interval, settings.backoff_factor, settings.backoff_cap)))
         .collect();
 
     let mut app = App {
