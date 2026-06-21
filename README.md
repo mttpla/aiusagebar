@@ -62,6 +62,14 @@ export COPILOT_GITHUB_TOKEN=github_pat_...
 
 ---
 
+## Troubleshooting
+
+If a provider row shows an error, open **Other ▶ Diagnostics ▶ Copy diagnostic log**
+to copy the full diagnostic log to your clipboard. Paste it into a GitHub issue or email
+when reporting a bug. The Diagnostics submenu is hidden when there is nothing to report.
+
+---
+
 ## Requirements
 
 - macOS 11+

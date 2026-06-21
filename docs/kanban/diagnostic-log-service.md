@@ -1,7 +1,7 @@
 ---
 id: 44
 title: Diagnostic log service + "Other" menu
-status: backlog
+status: done
 priority: Normal
 tags: [robustness, logging, ux, pre-1.0]
 created: 2026-06-17
