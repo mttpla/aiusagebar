@@ -3,7 +3,7 @@ id: 46
 status: backlog
 priority: Normal
 blocked_by: [44]
-tags: [robustness, logging, post-1.0]
+tags: [robustness, logging, pre-1.0]
 created: 2026-06-18
 updated: 2026-06-18
 ---
