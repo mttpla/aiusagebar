@@ -73,9 +73,7 @@ impl App {
                     b.on_error(self.settings.backoff_factor, self.settings.backoff_cap);
                 }
                 _ => {
-                    if matches!(&state, UsageState::Ok(_, _)) {
-                        b.on_success(self.settings.poll_interval);
-                    }
+                    b.on_success(self.settings.poll_interval);
                 }
             }
             states.push((kind, state));
