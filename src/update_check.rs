@@ -18,7 +18,7 @@ pub(crate) fn parse_release(json: &str) -> Option<String> {
     Some(tag.to_owned())
 }
 
-pub fn check() -> Option<String> {
+pub(crate) fn check() -> Option<String> {
     let json = crate::http::get_public(
         "https://api.github.com/repos/mttpla/aiusagebar/releases/latest",
     )

@@ -3,7 +3,7 @@ use std::time::Duration;
 use ureq::tls::{TlsConfig, TlsProvider};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum HttpError {
+pub(crate) enum HttpError {
     Unauthorized,
     RateLimited,
     ServerError(u16),
@@ -12,7 +12,7 @@ pub enum HttpError {
 
 /// Return type for [`get`]: the parsed result plus the raw body whenever the
 /// server responded (None only on network/IO errors).
-pub type GetResult = (Result<String, HttpError>, Option<String>);
+pub(crate) type GetResult = (Result<String, HttpError>, Option<String>);
 
 fn agent() -> &'static ureq::Agent {
     static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
@@ -26,7 +26,7 @@ fn agent() -> &'static ureq::Agent {
     })
 }
 
-pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> (Result<String, HttpError>, Option<String>) {
+pub(crate) fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> (Result<String, HttpError>, Option<String>) {
     let mut req = agent()
         .get(url)
         .header("Authorization", &format!("Bearer {}", token));
@@ -61,7 +61,7 @@ pub fn get(url: &str, token: &str, extra_headers: &[(&str, &str)]) -> (Result<St
     (result, raw)
 }
 
-pub fn get_public(url: &str) -> Result<String, HttpError> {
+pub(crate) fn get_public(url: &str) -> Result<String, HttpError> {
     let resp = agent()
         .get(url)
         .header("User-Agent", concat!("aiusagebar/", env!("CARGO_PKG_VERSION")))

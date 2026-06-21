@@ -1,5 +1,5 @@
 #[cfg(target_os = "macos")]
-pub fn read_generic_password(service: &str, account: &str) -> Option<String> {
+pub(crate) fn read_generic_password(service: &str, account: &str) -> Option<String> {
     use security_framework::passwords::get_generic_password;
     get_generic_password(service, account)
         .ok()
@@ -7,12 +7,12 @@ pub fn read_generic_password(service: &str, account: &str) -> Option<String> {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn read_generic_password(_service: &str, _account: &str) -> Option<String> {
+pub(crate) fn read_generic_password(_service: &str, _account: &str) -> Option<String> {
     None
 }
 
 #[cfg(target_os = "macos")]
-pub fn enumerate_generic_passwords(service: &str) -> Vec<(String, String)> {
+pub(crate) fn enumerate_generic_passwords(service: &str) -> Vec<(String, String)> {
     use core_foundation::base::TCFType;
     use core_foundation::string::{CFString, CFStringRef};
     use security_framework::item::{ItemClass, ItemSearchOptions, Limit, SearchResult};
@@ -48,7 +48,7 @@ pub fn enumerate_generic_passwords(service: &str) -> Vec<(String, String)> {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn enumerate_generic_passwords(_service: &str) -> Vec<(String, String)> {
+pub(crate) fn enumerate_generic_passwords(_service: &str) -> Vec<(String, String)> {
     Vec::new()
 }
 

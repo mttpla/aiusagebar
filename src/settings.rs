@@ -1,15 +1,15 @@
 use std::time::Duration;
 
-pub const DEFAULT_POLL_INTERVAL: Duration       = Duration::from_secs(300);
-pub const DEFAULT_ALERT_THRESHOLD_PCT: f32      = 80.0;
-pub const DEFAULT_BACKOFF_FACTOR: u32           = 2;
-pub const DEFAULT_BACKOFF_CAP: Duration         = Duration::from_secs(3600);
+pub(crate) const DEFAULT_POLL_INTERVAL: Duration       = Duration::from_secs(300);
+pub(crate) const DEFAULT_ALERT_THRESHOLD_PCT: f32      = 80.0;
+pub(crate) const DEFAULT_BACKOFF_FACTOR: u32           = 2;
+pub(crate) const DEFAULT_BACKOFF_CAP: Duration         = Duration::from_secs(3600);
 
-pub struct Settings {
-    pub poll_interval:       Duration,
-    pub alert_threshold_pct: f32,
-    pub backoff_factor:      u32,
-    pub backoff_cap:         Duration,
+pub(crate) struct Settings {
+    pub(crate) poll_interval:       Duration,
+    pub(crate) alert_threshold_pct: f32,
+    pub(crate) backoff_factor:      u32,
+    pub(crate) backoff_cap:         Duration,
 }
 
 impl Default for Settings {

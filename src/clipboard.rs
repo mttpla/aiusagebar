@@ -2,7 +2,7 @@
 
 /// Copies `text` to the macOS general pasteboard, replacing its contents.
 #[cfg(target_os = "macos")]
-pub fn copy(text: &str) {
+pub(crate) fn copy(text: &str) {
     use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
     use objc2_foundation::NSString;
     unsafe {
@@ -16,7 +16,7 @@ pub fn copy(text: &str) {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn copy(_text: &str) {}
+pub(crate) fn copy(_text: &str) {}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-pub struct BackoffState {
+pub(crate) struct BackoffState {
     base: Duration,
     factor: u32,
     cap: Duration,
@@ -9,7 +9,7 @@ pub struct BackoffState {
 }
 
 impl BackoffState {
-    pub fn new(base: Duration, factor: u32, cap: Duration) -> Self {
+    pub(crate) fn new(base: Duration, factor: u32, cap: Duration) -> Self {
         Self {
             base,
             factor,
@@ -19,21 +19,21 @@ impl BackoffState {
         }
     }
 
-    pub fn on_success(&mut self) {
+    pub(crate) fn on_success(&mut self) {
         self.current_interval = self.base;
         self.next_allowed_at = Instant::now() + self.base;
     }
 
-    pub fn on_error(&mut self) {
+    pub(crate) fn on_error(&mut self) {
         self.current_interval = (self.current_interval * self.factor).min(self.cap);
         self.next_allowed_at = Instant::now() + self.current_interval;
     }
 
-    pub fn is_allowed(&self) -> bool {
+    pub(crate) fn is_allowed(&self) -> bool {
         Instant::now() >= self.next_allowed_at
     }
 
-    pub fn next_allowed_at(&self) -> Instant {
+    pub(crate) fn next_allowed_at(&self) -> Instant {
         self.next_allowed_at
     }
 }

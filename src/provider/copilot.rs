@@ -47,7 +47,7 @@ fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
     Ok(windows)
 }
 
-pub fn do_copilot_fetch(
+pub(crate) fn do_copilot_fetch(
     tokens: Vec<(String, String)>,
     http: &dyn Fn(&str) -> GetResult,
 ) -> (UsageState, Option<HttpError>, Option<String>) {
@@ -137,12 +137,12 @@ fn load_copilot_tokens() -> Vec<(String, String)> {
     tokens
 }
 
-pub struct CopilotProvider {
+pub(crate) struct CopilotProvider {
     last_raw_json: Mutex<Option<String>>,
 }
 
 impl CopilotProvider {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             last_raw_json: Mutex::new(None),
         }

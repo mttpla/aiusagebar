@@ -17,18 +17,18 @@ struct OauthEntry {
     expires_at: u64,
 }
 
-pub struct ClaudeCredentials {
-    pub access_token: String,
-    pub expires_at_ms: u64,
+pub(crate) struct ClaudeCredentials {
+    pub(crate) access_token: String,
+    pub(crate) expires_at_ms: u64,
 }
 
-pub enum CredLoad {
+pub(crate) enum CredLoad {
     NotConfigured,
     Malformed(String),
     Ok(ClaudeCredentials),
 }
 
-pub fn parse_credentials_payload(json: Option<String>) -> CredLoad {
+pub(crate) fn parse_credentials_payload(json: Option<String>) -> CredLoad {
     let Some(json) = json else { return CredLoad::NotConfigured; };
     match serde_json::from_str::<CredentialsFile>(&json) {
         Ok(file) => CredLoad::Ok(ClaudeCredentials {
@@ -39,7 +39,7 @@ pub fn parse_credentials_payload(json: Option<String>) -> CredLoad {
     }
 }
 
-pub fn load_credentials() -> CredLoad {
+pub(crate) fn load_credentials() -> CredLoad {
     parse_credentials_payload(load_credentials_json())
 }
 
@@ -52,7 +52,7 @@ fn load_credentials_json() -> Option<String> {
     std::fs::read_to_string(path).ok()
 }
 
-pub fn is_expired(expires_at_ms: u64) -> bool {
+pub(crate) fn is_expired(expires_at_ms: u64) -> bool {
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -60,7 +60,7 @@ pub fn is_expired(expires_at_ms: u64) -> bool {
     expires_at_ms <= now_ms
 }
 
-pub fn format_expiry_date(expires_at_ms: u64) -> String {
+pub(crate) fn format_expiry_date(expires_at_ms: u64) -> String {
     use chrono::{Local, TimeZone};
     let secs = (expires_at_ms / 1000) as i64;
     match Local.timestamp_opt(secs, 0) {
@@ -169,7 +169,7 @@ fn last_ok_summary(windows: &[LimitWindow]) -> String {
         .join(" · ")
 }
 
-pub struct ClaudeProvider {
+pub(crate) struct ClaudeProvider {
     last_ok: Mutex<Option<Vec<LimitWindow>>>,
     profile: Mutex<Option<ProfileData>>,
     last_raw_json: Mutex<Option<String>>,
@@ -186,7 +186,7 @@ impl Default for ClaudeProvider {
 }
 
 impl ClaudeProvider {
-    pub fn new() -> Self { Self::default() }
+    pub(crate) fn new() -> Self { Self::default() }
 }
 
 fn fetch_profile(token: &str, ua: &str) -> Option<ProfileData> {

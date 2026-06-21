@@ -1,9 +1,9 @@
 use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu};
 
 pub(crate) struct FooterIds {
-    pub refresh: MenuId,
-    pub about: MenuId,
-    pub quit: MenuId,
+    pub(crate) refresh: MenuId,
+    pub(crate) about: MenuId,
+    pub(crate) quit: MenuId,
 }
 
 /// Appends Refresh, separator, About, Quit. Always adds exactly 4 items.
