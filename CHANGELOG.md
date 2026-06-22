@@ -1,5 +1,86 @@
 # Changelog
 
+## [v0.5.0] - 2026-06-22
+
+### Bug Fixes
+
+- Accept null resets_at from API
+- Remove unused setup menu fields pending main.rs implementation
+- Remove unused raw_json trait method
+- Remove show() function with expect(dead_code) suppression
+- Remove premature details click handler
+- Use GetResult alias in get_returns_tuple test annotation
+- On_success advances next_allowed_at to prevent immediate re-poll
+- Advance backoff timer on all non-429/5xx outcomes
+- Address review — testable diag core, format_args macro, pasteboard error log
+- One global timer, tick fetches all providers
+
+### Documentation
+
+- Close cards #15 #18 — superseded by ureq migration
+- Defer #12 post-1.0, note backend already done
+- Spec, plan, and card for resets_at null fix (#43)
+- Spec and card for diagnostic log service
+- Close card #13 — onboarding empty state done
+- Add spec + plan for exponential backoff
+- Close card #19 — backoff done
+- Spec + card #45 — raw JSON details window
+- Reclassify #16 post-1.0, tag #44 pre-1.0
+- Reclassify #39 post-1.0, clarify scope
+- #37 post-1.0, note release section audit in #34
+- Update #44 spec, add #46 instrumentation sweep card
+- Add #47 fix BackoffState::on_success not advancing next_allowed_at
+- Add details-submenu card (#48) and raw-json plan
+- Add diagnostic-log-service plan (#44), start card, tag diag-sweep pre-1.0
+- Add Troubleshooting section for diagnostic log
+- Plan + scope update for diag instrumentation sweep
+- Spec + plan + card for Details-in-Other submenu (#48)
+- Spec + plan + cards for provider error boundary diag (#50, #51)
+- Spec + plan + card for non-provider diag gaps (#51)
+
+### Features
+
+- Clickable setup row for Claude NotConfigured state
+- Clickable setup row for Copilot NotConfigured state
+- Expose setup MenuIds in MenuBuild
+- Expose setup MenuIds in MenuBuild
+- Wire setup-page click handler + add provider setup docs
+- Add ServerError(u16) variant for 5xx responses
+- Add BackoffState with configurable factor and cap
+- Per-provider exponential backoff on 429/5xx
+- Strip + LTO release profile (#17)
+- Http::get returns raw body alongside result
+- Add raw_json() to UsageProvider trait with stub impls
+- Cache last raw HTTP body in last_raw_json field
+- Cache raw HTTP body per-account in last_raw_json
+- Add details module with raw JSON window
+- Add Details menu item to each provider section
+- Wire Details menu items to show raw HTTP response window
+- Add diagnostic log service with Other menu and error hooks
+- Log Keychain read/enumerate failures, skip not-found
+- Log network/status/body errors in http get_public
+- Log Claude HTTP-error arms and profile parse failures
+- Log Copilot per-account HTTP and parse errors
+- Add other_entries decision for Other submenu contents
+- Render provider Details inside the Other submenu
+- Remove flat Details from provider sections
+- Add state_diag_message boundary helper
+- Log provider Error/Stale states at refresh_all boundary
+- Log credential-file and Keychain enumerate read failures
+- Log update-check parse, tray icon, and open-command failures
+
+### Miscellaneous
+
+- Mark diagnostic-log-service card (#44) done
+- Tighten item visibility to pub(crate)
+- Mark diag-instrumentation-sweep card done
+- Mark details-submenu card #48 done
+
+### Refactoring
+
+- Replace fetch with fetch_with_http_error
+- BackoffState owns base/factor/cap config
+
 ## [v0.4.0] - 2026-06-16
 
 ### Bug Fixes
