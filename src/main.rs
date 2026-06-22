@@ -70,6 +70,9 @@ impl App {
                 continue;
             }
             let (state, http_err) = self.providers[i].fetch_with_http_error();
+            if let Some(msg) = crate::provider::state_diag_message(kind.display_name(), &state) {
+                crate::diag!(crate::diag::Level::Err, "{}", msg);
+            }
             let b = self.backoff.get_mut(&kind).expect("backoff entry missing");
             match http_err {
                 Some(HttpError::RateLimited | HttpError::ServerError(_)) => {
