@@ -1,12 +1,12 @@
 ---
 id: 34
-status: backlog
+status: doing
 priority: High
 tags: [docs, pre-1.0]
-blocked_by: [10, 11]
 spec: superpowers/specs/2026-06-13-readme-revamp-design.md
+plan: superpowers/plans/2026-06-22-readme-revamp.md
 created: 2026-06-13
-updated: 2026-06-18
+updated: 2026-06-22
 ---
 # README revamp for 1.0.0
 
@@ -16,3 +16,5 @@ Rewrite README so a non-contributor can install via DMG, complete first run with
 - 2026-06-13: Captured from 1.0.0 readiness review. Decisions: single card (not split); MIT license; first-run walkthrough uses screenshots (Keychain dialog, tray icon, menu open); reuse `assets/demo.png` from card #10 for menu-open screenshot to avoid duplicate file. Hard-blocked by #10 (provides `assets/demo.png`) and #11 (provides DMG artifact + Releases URL pattern). Unblocked sections can be drafted earlier (Codex removal, Configuration, Keychain explainer, Troubleshooting, Development, Releasing, License), but PR not closable until both blockers land. Rejected: CHANGELOG link in README (file already visible in tree); pre-1.0 status badge (version number suffices); Sparkle / auto-update mention (card #20, post-1.0); architecture docs (CLAUDE.md covers); CHANGELOG / Codex re-add deferred to follow-up cards. Note for implementer: replace `<owner>/<repo>` placeholder in Releases URL with the real GitHub coords.
 - 2026-06-16: Partial work landed in worktree branch `worktree-readme-cleanup` (commit e853981). Changes done: removed OpenAI row from providers table, renamed Anthropic→Claude and GitHub Copilot→Copilot, added `![Demo screenshot](assets/demo.png)` placeholder (image file lands with #10). These sections don't overlap with the Installation section card #11 adds, so rebase/merge onto master after #11 lands will be conflict-free.
 - 2026-06-18: **Implementer note — review release section carefully.** `release.sh` has evolved since the spec was written: it now handles the full local release flow (build, sign, `gh release create --draft`, binary upload). README releasing section may be stale or missing these steps. Audit actual `scripts/release.sh` before writing the Releasing section.
+- 2026-06-22: **Refreshed + moved to `doing`.** Blockers #10 + #11 both `done` → `blocked_by` cleared. Audited current README vs spec (ground truth as of today). Spec partly superseded — added a "Refresh — 2026-06-22" addendum at the top of the spec; read that first. Findings: (1) Already shipped, dropped from scope — Codex/OpenAI removal, Claude/Copilot naming, embedded `demo.png`, Troubleshooting (diagnostic-log approach, kept over the spec's static table), Install section. (2) **Distribution model changed** — original DMG/.app premise (sections 5+6) is dead; install is now a raw `aiusagebar-macos-arm64` binary + Gatekeeper workaround. DMG bundling is a separate backlog card #42; first-run screenshots (`keychain-prompt.png`/`tray-icon.png`) descoped to a future card. (3) **Actual remaining scope:** add `LICENSE` (MIT, `Copyright (c) 2026 mttpla`), `license = "MIT"` in `Cargo.toml`, README License section, badges (release + License:MIT), expand Keychain section to why/what/where, surface full Copilot token-priority chain in a Configuration section, move `Rust 1.75+` out of top-level Requirements into Development, and rewrite the stale Releasing section (verified `scripts/release.sh` now does bump+changelog+commit+tag+**push**+`cargo build --release`+ad-hoc `codesign`+`gh release create` w/ binary upload — README still says "push manually" and omits build/sign/release).
+- 2026-06-22: **Screenshots re-scoped in.** Decided to keep two end-user dialog screenshots in this card (the initial refresh wrongly descoped them by tying them to the dead DMG walkthrough): `assets/gatekeeper-prompt.png` (the "unidentified developer" / right-click→Open dialog, in the Install section) and `assets/keychain-prompt.png` (the "Always Allow" dialog, in the Keychain section). These two apply to the raw-binary install path and kill the two scariest first-run surprises. Descoped to a future card: the full `.app` first-run walkthrough and `tray-icon.png` (3 tray states stay as the existing text table). Spec addendum updated to match.

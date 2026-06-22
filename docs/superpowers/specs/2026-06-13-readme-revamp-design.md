@@ -1,5 +1,64 @@
 # README revamp for 1.0.0
 
+## Refresh — 2026-06-22 (read this first; supersedes stale parts below)
+
+The README evolved a lot since the original spec. Ground truth as of 2026-06-22:
+
+**Already shipped (drop from scope):**
+- OpenAI/Codex references removed (`rg -i "openai|codex" README.md` → nothing).
+- Provider naming unified to **Claude** / **Copilot**.
+- `assets/demo.png` embedded under the tagline.
+- Troubleshooting section exists — but uses the **diagnostic-log** approach
+  (Other ▸ Diagnostics ▸ Copy diagnostic log), not the static symptom/cause/fix
+  table the original Design proposed. Keep the diagnostic-log approach.
+- An Install section exists.
+
+**Distribution model changed — the original DMG premise is dead:**
+- The original Design (sections 5 "Install" and 6 "First run") assumed a signed
+  `.app` inside a DMG from card #11. Reality: distribution is a **raw
+  `aiusagebar-macos-arm64-vX.Y.Z` binary** + a Gatekeeper workaround
+  (right-click Open, or `xattr -dr com.apple.quarantine`).
+- DMG / `.app` bundling is now a **separate backlog card (#42
+  `dmg-app-bundle-distribution`)**. When it lands, a follow-up updates the Install
+  section. This card documents the **binary** install path only.
+- Consequence: original sections 5 (DMG Install) and 6 (DMG first-run walkthrough)
+  below are superseded by the binary install path. The full multi-step `.app`
+  walkthrough and the `tray-icon.png` capture are **descoped** to a future card.
+  **In scope for this card (decided 2026-06-22):** two dialog screenshots that
+  apply to the binary path — `assets/gatekeeper-prompt.png` (the "unidentified
+  developer" / right-click→Open dialog) and `assets/keychain-prompt.png` (the
+  Keychain "Always Allow" dialog). These remove the two scariest first-run
+  surprises. Embed `gatekeeper-prompt.png` in the Install section and
+  `keychain-prompt.png` in the Keychain access section.
+
+**Remaining work for this card (the actual scope now):**
+1. `LICENSE` file (MIT) — absent. Copyright line `Copyright (c) 2026 mttpla`.
+2. `license = "MIT"` in `Cargo.toml` `[package]` — absent.
+3. **License** section in README — absent.
+4. Badges (latest release + License: MIT) — absent.
+5. **Keychain access** depth — current text is one short paragraph; expand to the
+   why / what / where-it-never-goes form (original section 8 still valid).
+6. **Configuration** — surface the full Copilot token priority chain
+   (`COPILOT_GITHUB_TOKEN` → `GH_TOKEN` → `GITHUB_TOKEN` → Keychain `copilot-cli`
+   → `~/.copilot/config.json` → `~/.config/gh/hosts.yml`); currently only
+   `COPILOT_GITHUB_TOKEN` is shown (inside the Keychain section).
+7. **Requirements / Development** — `Rust 1.75+` is still under top-level
+   Requirements; move it under Development (end users don't need a Rust toolchain).
+8. **Screenshots** — capture and commit `assets/gatekeeper-prompt.png` (Install
+   section) and `assets/keychain-prompt.png` (Keychain section). Redact any
+   personal info (email, account names) before committing.
+9. **Releasing** section is **stale**: `scripts/release.sh` now bumps + changelog
+   + commits + tags + **pushes** + `cargo build --release` + ad-hoc
+   `codesign` + `gh release create` with the binary uploaded. README still says
+   "Push manually after reviewing" and omits the build/sign/release steps. Rewrite
+   to match the actual script.
+
+Verification checklist (original "Tests" section) still applies for items 1–4.
+Sections of the original Design below remain authoritative **except** Install (5)
+and First run (6), which the binary-distribution model supersedes.
+
+---
+
 ## Problem
 
 `README.md` (118 lines) is contributor-oriented and contains stale information:
