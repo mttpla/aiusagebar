@@ -1,6 +1,6 @@
 ---
 id: 46
-status: backlog
+status: done
 priority: Normal
 blocked_by: [44]
 tags: [robustness, logging, pre-1.0]
