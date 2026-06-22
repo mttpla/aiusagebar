@@ -8,7 +8,7 @@
 
 **Tech Stack:** Markdown, shields.io badges, MIT license text, macOS screenshot capture.
 
-> **Progress — 2026-06-22:** Tasks 2, 3, 6, 7, 8 done and pushed to `master` (LICENSE + license metadata; badges; Configuration section; Rust→Development; Releasing rewrite; License section). The `COPILOT_GITHUB_TOKEN` block was moved out of Keychain into Configuration as part of this pass. **Remaining:** Task 1 (human captures `gatekeeper-prompt.png` + `keychain-prompt.png` — agent cannot screenshot system dialogs), then Tasks 4 (Install + Gatekeeper screenshot) and 5 (Keychain screenshot embed). Card stays in `doing` until those land.
+> **Complete — 2026-06-22:** All tasks done, card `done`. Tasks 2,3,6,7,8 first (LICENSE + metadata; badges; Configuration; Rust→Development; Releasing rewrite; License section), then Task 1 (3 screenshots captured by the human) + Tasks 4,5 (Install + Keychain embeds). **Deviation:** Gatekeeper workaround documents **System Settings → Privacy & Security → Open Anyway** (`gatekeeper-prompt.png`) instead of the plan's right-click→Open (which no longer bypasses Gatekeeper on current macOS); the dead-end "Move to Trash" dialog (`gatekeeper-blocked.png`, a 3rd screenshot) is covered in a new Troubleshooting subsection. See the card narrative for details.
 
 ## Global Constraints
 
