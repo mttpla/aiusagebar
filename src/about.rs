@@ -71,9 +71,12 @@ pub(crate) fn show() {
     alert.addButtonWithTitle(&NSString::from_str("www.matteopaoli.it"));
     let response = alert.runModal();
     if response == NSAlertSecondButtonReturn {
-        let _ = std::process::Command::new("open")
+        if let Err(e) = std::process::Command::new("open")
             .arg("https://www.matteopaoli.it")
-            .spawn();
+            .spawn()
+        {
+            crate::diag!(crate::diag::Level::Err, "Failed to open matteopaoli.it: {}", e);
+        }
     }
 }
 

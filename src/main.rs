@@ -118,7 +118,9 @@ impl App {
         self.id_details_copilot = build.details_copilot;
         self.id_copy_diag = build.copy_diag;
         self.tray.set_menu(Some(Box::new(build.menu)));
-        self.tray.set_icon(Some(self.icons.get(icon_kind))).ok();
+        if let Err(e) = self.tray.set_icon(Some(self.icons.get(icon_kind))) {
+            crate::diag!(crate::diag::Level::Err, "Tray set_icon failed: {}", e);
+        }
         self.last_refreshed_at = Some(now);
     }
 }
@@ -155,13 +157,20 @@ impl ApplicationHandler for App {
             } else if ev.id == self.id_refresh && !did_refresh {
                 self.refresh_all(true);
             } else if self.id_update.as_ref().is_some_and(|id| ev.id == *id) {
-                let _ = std::process::Command::new("open")
+                if let Err(e) = std::process::Command::new("open")
                     .arg("https://github.com/mttpla/aiusagebar/releases/latest")
-                    .spawn();
+                    .spawn()
+                {
+                    crate::diag!(crate::diag::Level::Err, "Failed to open releases page: {}", e);
+                }
             } else if self.id_setup_claude.as_ref().is_some_and(|id| ev.id == *id) {
-                let _ = std::process::Command::new("open").arg(CLAUDE_SETUP_URL).spawn();
+                if let Err(e) = std::process::Command::new("open").arg(CLAUDE_SETUP_URL).spawn() {
+                    crate::diag!(crate::diag::Level::Err, "Failed to open {}: {}", CLAUDE_SETUP_URL, e);
+                }
             } else if self.id_setup_copilot.as_ref().is_some_and(|id| ev.id == *id) {
-                let _ = std::process::Command::new("open").arg(COPILOT_SETUP_URL).spawn();
+                if let Err(e) = std::process::Command::new("open").arg(COPILOT_SETUP_URL).spawn() {
+                    crate::diag!(crate::diag::Level::Err, "Failed to open {}: {}", COPILOT_SETUP_URL, e);
+                }
             } else if self.id_details_claude.as_ref().is_some_and(|id| ev.id == *id) {
                 let raw = self.providers.iter()
                     .find(|p| p.kind() == crate::provider::ProviderKind::Claude)
@@ -193,7 +202,7 @@ impl ApplicationHandler for App {
 
 fn main() {
     if let Err(e) = launch_at_login::enable() {
-        eprintln!("[launch_at_login] {e}");
+        crate::diag!(crate::diag::Level::Err, "launch_at_login enable failed: {}", e);
     }
 
     let providers: Vec<Box<dyn UsageProvider>> = vec![
