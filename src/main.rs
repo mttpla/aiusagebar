@@ -88,9 +88,23 @@ impl App {
         let icon_kind = IconKind::for_providers(&state_refs, self.settings.alert_threshold_pct);
         let refs: Vec<(ProviderKind, &UsageState)> =
             states.iter().map(|(k, s)| (*k, s)).collect();
+        let details_kinds: Vec<ProviderKind> = refs
+            .iter()
+            .map(|(k, _)| *k)
+            .filter(|k| {
+                self.providers
+                    .iter()
+                    .any(|p| p.kind() == *k && p.raw_json().is_some())
+            })
+            .collect();
         let now = Local::now();
         let updated = now.format("%H:%M").to_string();
-        let build = ui::build_menu(&refs, Some(&updated), self.update_available.as_deref());
+        let build = ui::build_menu(
+            &refs,
+            Some(&updated),
+            self.update_available.as_deref(),
+            &details_kinds,
+        );
         self.id_about = build.about;
         self.id_refresh = build.refresh;
         self.id_quit = build.quit;
@@ -198,7 +212,7 @@ fn main() {
         .iter()
         .map(|p| (p.kind(), &initial_state))
         .collect();
-    let build = ui::build_menu(&initial_refs, None, None);
+    let build = ui::build_menu(&initial_refs, None, None, &[]);
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(build.menu))
