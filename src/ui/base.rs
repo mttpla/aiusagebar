@@ -66,7 +66,7 @@ pub(crate) fn append_other(menu: &Menu, details_kinds: &[ProviderKind]) -> Other
         match entry {
             OtherEntry::Provider(kind) => {
                 let sub = Submenu::new(kind.display_name(), true);
-                let item = MenuItem::new("Details\u{2026}", true, None);
+                let item = MenuItem::new("Details…", true, None);
                 let id = item.id().clone();
                 sub.append(&item).expect("menu append failed");
                 other.append(&sub).expect("menu append failed");
