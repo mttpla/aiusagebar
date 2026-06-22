@@ -1,6 +1,6 @@
 ---
 id: 52
-status: doing
+status: done
 priority: High
 tags: [bug, backoff, polling, claude, pre-1.0]
 spec: docs/superpowers/specs/2026-06-22-synchronized-global-backoff-design.md
@@ -58,3 +58,5 @@ still forces. Fixes the silent vanish and makes the "Updated" timestamp honest.
   import removed; `BackoffState::current_interval()` accessor added. 5 new
   `should_back_off` unit tests. `cargo clippy -- -D warnings` clean, 196 tests pass.
   Pending: manual acceptance (`make dev`, GUI) before moving to done.
+- 2026-06-22: Manual acceptance passed (`make dev`, GUI confirmed by user — Claude
+  no longer vanishes on auto-refresh). Closed. Done.
