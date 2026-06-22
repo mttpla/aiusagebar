@@ -72,20 +72,31 @@ pub(crate) fn do_copilot_fetch(
         match result {
             Ok(body) => match parse_copilot_response(&body) {
                 Ok(windows) => ok_windows.extend(windows),
-                Err(e) => error_msgs.push(format!("@{} — {}", account, e)),
+                Err(e) => {
+                    crate::diag!(crate::diag::Level::Err, "Copilot parse failed for @{}: {}", account, e);
+                    error_msgs.push(format!("@{} — {}", account, e));
+                }
             },
-            Err(HttpError::Unauthorized) => stale_accounts.push(account.clone()),
+            Err(HttpError::Unauthorized) => {
+                crate::diag!(crate::diag::Level::Err, "Copilot usage fetch unauthorized (401) for @{}", account);
+                stale_accounts.push(account.clone());
+            }
             Err(HttpError::RateLimited) => {
+                crate::diag!(crate::diag::Level::Err, "Copilot usage fetch rate limited (429) for @{}", account);
                 error_msgs.push(format!("@{} — rate limited", account));
                 backoff_err = Some(HttpError::RateLimited);
             }
             Err(HttpError::ServerError(c)) => {
+                crate::diag!(crate::diag::Level::Err, "Copilot usage fetch server error {} for @{}", c, account);
                 error_msgs.push(format!("@{} — server error {c}", account));
                 if backoff_err.is_none() {
                     backoff_err = Some(HttpError::ServerError(c));
                 }
             }
-            Err(HttpError::Other(e)) => error_msgs.push(format!("@{} — {}", account, e)),
+            Err(HttpError::Other(e)) => {
+                crate::diag!(crate::diag::Level::Err, "Copilot usage fetch failed for @{}: {}", account, e);
+                error_msgs.push(format!("@{} — {}", account, e));
+            }
         }
     }
 
