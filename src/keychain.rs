@@ -1,9 +1,44 @@
+/// OSStatus for "no such Keychain item" — the expected NotConfigured path.
+#[cfg(target_os = "macos")]
+const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
+
+/// True for Keychain errors worth logging — genuine read failures, not the
+/// expected `errSecItemNotFound` that simply means the provider is unconfigured.
+#[cfg(target_os = "macos")]
+fn keychain_error_is_loggable(code: i32) -> bool {
+    code != ERR_SEC_ITEM_NOT_FOUND
+}
+
 #[cfg(target_os = "macos")]
 pub(crate) fn read_generic_password(service: &str, account: &str) -> Option<String> {
     use security_framework::passwords::get_generic_password;
-    get_generic_password(service, account)
-        .ok()
-        .and_then(|bytes| String::from_utf8(bytes).ok())
+    let bytes = match get_generic_password(service, account) {
+        Ok(b) => b,
+        Err(e) => {
+            if keychain_error_is_loggable(e.code()) {
+                crate::diag!(
+                    crate::diag::Level::Err,
+                    "Keychain read failed for service {} (status {}): {}",
+                    service,
+                    e.code(),
+                    e
+                );
+            }
+            return None;
+        }
+    };
+    match String::from_utf8(bytes) {
+        Ok(s) => Some(s),
+        Err(e) => {
+            crate::diag!(
+                crate::diag::Level::Err,
+                "Keychain item for service {} is not valid UTF-8: {}",
+                service,
+                e
+            );
+            None
+        }
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -18,13 +53,27 @@ pub(crate) fn enumerate_generic_passwords(service: &str) -> Vec<(String, String)
     use security_framework::item::{ItemClass, ItemSearchOptions, Limit, SearchResult};
     use security_framework::passwords::get_generic_password;
 
-    let results = ItemSearchOptions::new()
+    let results = match ItemSearchOptions::new()
         .class(ItemClass::generic_password())
         .service(service)
         .limit(Limit::All)
         .load_attributes(true)
         .search()
-        .unwrap_or_default();
+    {
+        Ok(r) => r,
+        Err(e) => {
+            if keychain_error_is_loggable(e.code()) {
+                crate::diag!(
+                    crate::diag::Level::Err,
+                    "Keychain enumerate failed for service {} (status {}): {}",
+                    service,
+                    e.code(),
+                    e
+                );
+            }
+            Vec::new()
+        }
+    };
 
     results
         .into_iter()
@@ -66,6 +115,20 @@ mod tests {
     fn enumerate_nonexistent_service_returns_empty() {
         let result = super::enumerate_generic_passwords("__aiusagebar_test_nonexistent_xyzzy__");
         assert!(result.is_empty());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn item_not_found_is_not_loggable() {
+        // errSecItemNotFound is the expected "no credential" path — must not log.
+        assert!(!super::keychain_error_is_loggable(super::ERR_SEC_ITEM_NOT_FOUND));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn genuine_read_error_is_loggable() {
+        // errSecInteractionNotAllowed (-25308): a real failure worth logging.
+        assert!(super::keychain_error_is_loggable(-25308));
     }
 
 }
