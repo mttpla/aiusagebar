@@ -94,12 +94,10 @@ pub(crate) fn build_menu(
     for (kind, state) in states {
         match kind {
             ProviderKind::Claude => {
-                let (sc, _dc) = claude::append_claude_section(&menu, state);
-                setup_claude = sc;
+                setup_claude = claude::append_claude_section(&menu, state);
             }
             ProviderKind::Copilot => {
-                let (sc, _dc) = copilot::append_copilot_section(&menu, state);
-                setup_copilot = sc;
+                setup_copilot = copilot::append_copilot_section(&menu, state);
             }
         }
     }
@@ -152,8 +150,8 @@ mod tests {
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.header_indices[0].0, 0);
-        assert_eq!(layout.refresh_idx, 5);
-        assert_eq!(layout.quit_idx, 8);
+        assert_eq!(layout.refresh_idx, 4);
+        assert_eq!(layout.quit_idx, 7);
     }
 
     #[test]
@@ -195,10 +193,10 @@ mod tests {
         assert_eq!(layout.window_items.len(), 3);
         assert_eq!(layout.window_items[0].0, 1);
         assert_eq!(layout.window_items[1].0, 2);
-        assert_eq!(layout.window_items[2].0, 5);
+        assert_eq!(layout.window_items[2].0, 4);
         assert_eq!(layout.window_items[2].1.name, "monthly");
-        assert_eq!(layout.refresh_idx, 8);
-        assert_eq!(layout.quit_idx, 11);
+        assert_eq!(layout.refresh_idx, 6);
+        assert_eq!(layout.quit_idx, 9);
     }
 
     #[test]
@@ -218,9 +216,9 @@ mod tests {
         assert_eq!(layout.header_indices[0].0, 2);
         // window item was at 1, now at 3
         assert_eq!(layout.window_items[0].0, 3);
-        // refresh was at 3 without Other/update; +1 Other +2 update = 6
-        assert_eq!(layout.refresh_idx, 6);
-        assert_eq!(layout.quit_idx, 9);
+        // update prefix=2, header+window=2 → idx=4; Other at 4, Refresh=5
+        assert_eq!(layout.refresh_idx, 5);
+        assert_eq!(layout.quit_idx, 8);
     }
 
     #[test]
@@ -231,6 +229,6 @@ mod tests {
         );
         let layout = build_layout(&[(ProviderKind::Claude, &state)], None, None);
         assert_eq!(layout.header_indices[0].0, 0);
-        assert_eq!(layout.refresh_idx, 4);
+        assert_eq!(layout.refresh_idx, 3);
     }
 }
