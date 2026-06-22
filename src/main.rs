@@ -13,7 +13,6 @@ mod provider;
 mod ui;
 mod update_check;
 
-use std::collections::HashMap;
 use std::time::Instant;
 use backoff::BackoffState;
 use chrono::{DateTime, Local};
@@ -39,6 +38,15 @@ const CLAUDE_SETUP_URL: &str =
 const COPILOT_SETUP_URL: &str =
     "https://github.com/mttpla/aiusagebar/blob/master/copilot-setup.md";
 
+/// True when any provider in the batch returned a 429/5xx — the only outcomes
+/// that extend the global backoff. All other outcomes (network/parse error,
+/// `Unauthorized`, `NotConfigured`) advance the timer normally via `on_success`.
+fn should_back_off(http_errs: &[Option<HttpError>]) -> bool {
+    http_errs
+        .iter()
+        .any(|e| matches!(e, Some(HttpError::RateLimited | HttpError::ServerError(_))))
+}
+
 struct App {
     tray: tray_icon::TrayIcon,
     icons: Icons,
@@ -54,38 +62,47 @@ struct App {
     providers: Vec<Box<dyn UsageProvider>>,
     last_refreshed_at: Option<DateTime<Local>>,
     settings: Settings,
-    backoff: HashMap<ProviderKind, BackoffState>,
+    backoff: BackoffState,
     next_update_check_after: DateTime<Local>,
     update_available: Option<String>,
 }
 
 impl App {
     fn refresh_all(&mut self, force: bool) {
+        if !force && !self.backoff.is_allowed() {
+            return;
+        }
         let count = self.providers.len();
         let mut states: Vec<(ProviderKind, UsageState)> = Vec::with_capacity(count);
+        let mut http_errs: Vec<Option<HttpError>> = Vec::with_capacity(count);
         for i in 0..count {
             let kind = self.providers[i].kind();
-            let is_allowed = self.backoff[&kind].is_allowed();
-            if !force && !is_allowed {
-                continue;
-            }
             let (state, http_err) = self.providers[i].fetch_with_http_error();
             if let Some(msg) = crate::provider::state_diag_message(kind.display_name(), &state) {
                 crate::diag!(crate::diag::Level::Err, "{}", msg);
             }
-            let b = self.backoff.get_mut(&kind).expect("backoff entry missing");
-            match http_err {
-                Some(HttpError::RateLimited | HttpError::ServerError(_)) => {
-                    b.on_error();
-                }
-                _ => {
-                    b.on_success();
-                }
-            }
             states.push((kind, state));
+            http_errs.push(http_err);
         }
-        if states.is_empty() {
-            return;
+        if should_back_off(&http_errs) {
+            self.backoff.on_error();
+            let reasons: Vec<String> = states
+                .iter()
+                .zip(&http_errs)
+                .filter_map(|((kind, _), err)| match err {
+                    Some(HttpError::RateLimited) => Some(format!("{} 429", kind.display_name())),
+                    Some(HttpError::ServerError(c)) => Some(format!("{} HTTP {c}", kind.display_name())),
+                    _ => None,
+                })
+                .collect();
+            crate::diag!(
+                crate::diag::Level::Err,
+                "Backoff extended to {}s after {}",
+                self.backoff.current_interval().as_secs(),
+                reasons.join(", ")
+            );
+        } else {
+            self.backoff.on_success();
         }
         let state_refs: Vec<&UsageState> = states.iter().map(|(_, s)| s).collect();
         let icon_kind = IconKind::for_providers(&state_refs, self.settings.alert_threshold_pct);
@@ -134,8 +151,7 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let mut did_refresh = false;
-        let any_provider_ready = self.backoff.values().any(|b| b.is_allowed());
-        if any_provider_ready {
+        if self.backoff.is_allowed() {
             self.refresh_all(false);
             did_refresh = true;
         }
@@ -187,10 +203,7 @@ impl ApplicationHandler for App {
         }
 
         let _ = TrayIconEvent::receiver().try_recv();
-        let next_provider = self.backoff.values()
-            .map(|b| b.next_allowed_at())
-            .min()
-            .unwrap_or_else(|| Instant::now() + self.settings.poll_interval);
+        let next_provider = self.backoff.next_allowed_at();
         let update_deadline = self.next_update_check_after
             .signed_duration_since(Local::now())
             .to_std()
@@ -234,10 +247,11 @@ fn main() {
         .expect("failed to create tray icon");
 
     let settings = Settings::default();
-    let backoff: HashMap<ProviderKind, BackoffState> = providers
-        .iter()
-        .map(|p| (p.kind(), BackoffState::new(settings.poll_interval, settings.backoff_factor, settings.backoff_cap)))
-        .collect();
+    let backoff = BackoffState::new(
+        settings.poll_interval,
+        settings.backoff_factor,
+        settings.backoff_cap,
+    );
 
     let mut app = App {
         tray,
@@ -259,4 +273,37 @@ fn main() {
         update_available: None,
     };
     event_loop.run_app(&mut app).expect("event loop error");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_back_off_empty_is_false() {
+        assert!(!should_back_off(&[]));
+    }
+
+    #[test]
+    fn should_back_off_all_none_is_false() {
+        assert!(!should_back_off(&[None, None]));
+    }
+
+    #[test]
+    fn should_back_off_rate_limited_is_true() {
+        assert!(should_back_off(&[None, Some(HttpError::RateLimited)]));
+    }
+
+    #[test]
+    fn should_back_off_server_error_is_true() {
+        assert!(should_back_off(&[Some(HttpError::ServerError(503))]));
+    }
+
+    #[test]
+    fn should_back_off_unauthorized_and_other_is_false() {
+        assert!(!should_back_off(&[
+            Some(HttpError::Unauthorized),
+            Some(HttpError::Other("dns".into())),
+        ]));
+    }
 }

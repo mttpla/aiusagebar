@@ -36,6 +36,10 @@ impl BackoffState {
     pub(crate) fn next_allowed_at(&self) -> Instant {
         self.next_allowed_at
     }
+
+    pub(crate) fn current_interval(&self) -> Duration {
+        self.current_interval
+    }
 }
 
 #[cfg(test)]
