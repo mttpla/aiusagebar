@@ -4,6 +4,9 @@ macOS menu bar app that shows AI coding quota usage for **Claude** and **Copilot
 
 Read-only monitor. Never sends prompts, never spends quota, never modifies credentials.
 
+[![Latest release](https://img.shields.io/github/v/release/mttpla/aiusagebar)](https://github.com/mttpla/aiusagebar/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ![Demo screenshot](assets/demo.png)
 
 ---
@@ -38,6 +41,27 @@ Per-provider states: **Not configured** · **Stale** (renew via official client)
 
 ---
 
+## Configuration
+
+Copilot needs a GitHub token. AIUsageBar looks for one in this priority order:
+
+1. `COPILOT_GITHUB_TOKEN` (recommended — a fine-grained PAT)
+2. `GH_TOKEN`
+3. `GITHUB_TOKEN`
+4. Keychain item `copilot-cli`
+5. `~/.copilot/config.json`
+6. `~/.config/gh/hosts.yml`
+
+To avoid the Copilot Keychain prompt, export a PAT before launching:
+
+```bash
+export COPILOT_GITHUB_TOKEN=github_pat_...
+```
+
+Claude needs no configuration beyond the `claude` CLI being logged in.
+
+---
+
 ## Icons
 
 Icons by [Font Awesome](https://fontawesome.com) (CC BY 4.0).
@@ -54,12 +78,6 @@ Icons by [Font Awesome](https://fontawesome.com) (CC BY 4.0).
 
 Claude token lives in the macOS Keychain (created by Claude Code). First read triggers a system dialog — click **Always Allow** once. Nothing is ever written back.
 
-To avoid the Copilot Keychain prompt, set a fine-grained PAT before launching:
-
-```bash
-export COPILOT_GITHUB_TOKEN=github_pat_...
-```
-
 ---
 
 ## Troubleshooting
@@ -73,12 +91,15 @@ when reporting a bug. The Diagnostics submenu is hidden when there is nothing to
 ## Requirements
 
 - macOS 11+
-- Rust 1.75+ (`rustup update`)
-- At least one provider's CLI logged in, or a Copilot PAT
+- At least one provider configured: the `claude` CLI logged in, or a Copilot PAT / `gh` login
 
 ---
 
 ## Development
+
+> Skip this section if you installed the binary from Releases.
+
+**Prerequisites:** Rust 1.75+ (`rustup update`).
 
 ### One-time setup (per machine)
 
@@ -118,13 +139,13 @@ cargo clippy             # lint
 
 ### Releasing a new version
 
-**Prerequisite:** `git-cliff` must be on PATH.
+**Prerequisites:** `git-cliff` and the GitHub CLI on PATH.
 
 ```bash
-brew install git-cliff   # once
+brew install git-cliff gh   # once
 ```
 
-Then from the repo root:
+From the repo root, on a clean `master` in sync with `origin`:
 
 ```bash
 ./scripts/release.sh patch   # 0.1.0 → 0.1.1
@@ -133,14 +154,16 @@ Then from the repo root:
 ```
 
 The script:
-1. Prompts for confirmation
-2. Bumps the version in `Cargo.toml`
-3. Regenerates `CHANGELOG.md` via `git-cliff`
-4. Commits both files (`chore(release): vX.Y.Z`)
-5. Creates the git tag `vX.Y.Z`
+1. Runs preflight checks (branch `master`, clean tree, synced with origin, tag unused)
+2. Runs the quality gate (`cargo clippy -- -D warnings` and `cargo test`)
+3. Bumps the version in `Cargo.toml`, syncs `Cargo.lock`, and regenerates `CHANGELOG.md`
+4. Commits (`chore(release): vX.Y.Z`) and creates the annotated tag
+5. Prompts to push — on confirm: pushes `master` + tag, builds the release binary, ad-hoc-signs it, packages `dist/aiusagebar-macos-arm64-vX.Y.Z`, and creates the GitHub release with the binary attached
 
-Push manually after reviewing:
+If you decline the push prompt, the script prints the exact build / sign / `gh release create` commands to run manually later.
 
-```bash
-git push && git push --tags
-```
+---
+
+## License
+
+Released under the MIT License. See [LICENSE](LICENSE).
