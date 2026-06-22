@@ -1,6 +1,6 @@
 ---
 id: 48
-status: doing
+status: done
 priority: Normal
 tags: [ui, debug, providers, pre-1.0]
 depends_on: [44]
@@ -28,6 +28,7 @@ Other ▶
 - 2026-06-22: Open questions resolved. (1) Provider "Details…" entry shown only when that provider has raw JSON. (2) Diagnostics entry hidden entirely when the diag log is empty (drop the "No diagnostics" placeholder there). (3) Order inside Other: providers first, Diagnostics last. Edge case: if no provider has raw JSON and diag is empty, Other would be empty — default to a single disabled "No diagnostics" placeholder only in that fully-empty case.
 - 2026-06-22: Code finding — raw JSON is not in `UsageState`; it lives behind `provider.raw_json()` (mutex `last_raw_json`). `build_menu` currently takes only `&[(ProviderKind, &UsageState)]`. To gate entries on raw-JSON presence, thread a per-provider raw-JSON-present bool (or `Option<&str>`) from `main.rs` (which holds the providers) through `build_menu` → `base::append_other`. `main.rs` click handler at lines 148-157 already re-fetches `raw_json()` at click time and stays unchanged.
 - 2026-06-22: Spec written and linked (`specs/2026-06-22-details-in-other-submenu-design.md`). Split check: keep as a single card — the change is atomic (removing flat Details before wiring Other would leave no Details). Proceeding to writing-plans.
+- 2026-06-22: Implemented via subagent-driven development on branch `feat/details-in-other-submenu` (commits dcb4e6e, 03389a5, 222ae08, acb270d). Per-task reviews + opus whole-branch review all clean (0 Critical/Important). Final state: Details lives only inside "Other ▶" as per-provider sub-submenus, shown only when the provider has raw JSON; Diagnostics shown only when the diag log is non-empty; disabled "No diagnostics" placeholder only when Other would otherwise be empty. `section_item_count` dropped by 1; click handler in main.rs unchanged. 185 tests pass, clippy clean. Plan brief had one arithmetic slip in a build_layout test (caught by implementer, confirmed by reviewer). Done.
 
 ## Scope
 
