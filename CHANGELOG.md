@@ -1,5 +1,29 @@
 # Changelog
 
+## [v1.0.0] - 2026-06-22
+
+### Documentation
+
+- Update spec/card, add implementation plan
+- Add spec and kanban card
+- Add spec and kanban card
+- Add spec and kanban card
+- Add MIT LICENSE and license metadata
+- Badges, Configuration, Keychain trim, Requirements/Development split, Releasing rewrite, License section
+- Record Tasks 2,3,6,7,8 done; screenshots remain
+- Add Gatekeeper and Keychain first-run screenshots
+- Finish README revamp — Install (Gatekeeper), Keychain depth, Troubleshooting blocked-dialog
+- Close card — all tasks done
+- Close card — manual acceptance passed
+
+### Miscellaneous
+
+- Gitignore .claude/ (local settings + worktrees)
+
+### Refactoring
+
+- Extract 24h update-check interval to settings const
+
 ## [v0.5.0] - 2026-06-22
 
 ### Bug Fixes
