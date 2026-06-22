@@ -34,6 +34,17 @@ impl ProviderKind {
     }
 }
 
+/// Returns the diagnostic message to log for a provider that ended a fetch in a
+/// non-happy state (`Error` or `Stale`), or `None` for happy/neutral states
+/// (`Ok`, `NotConfigured`). Pure — used by the `refresh_all` boundary so every
+/// provider error leaves a diagnostic trace without per-leaf instrumentation.
+pub(crate) fn state_diag_message(name: &str, state: &UsageState) -> Option<String> {
+    match state {
+        UsageState::Error(msg) | UsageState::Stale(msg) => Some(format!("{}: {}", name, msg)),
+        UsageState::Ok(..) | UsageState::NotConfigured => None,
+    }
+}
+
 pub(crate) trait UsageProvider: Send + Sync {
     fn kind(&self) -> ProviderKind;
     /// Returns the usage state plus the raw HTTP error that caused it, if any.
@@ -76,5 +87,31 @@ mod tests {
     fn copilot_provider_kind_is_copilot() {
         let p = CopilotProvider::new();
         assert_eq!(p.kind(), ProviderKind::Copilot);
+    }
+
+    #[test]
+    fn diag_message_error_includes_name_and_msg() {
+        let s = UsageState::Error("boom".to_string());
+        assert_eq!(state_diag_message("Claude", &s), Some("Claude: boom".to_string()));
+    }
+
+    #[test]
+    fn diag_message_stale_includes_name_and_msg() {
+        let s = UsageState::Stale("Expired on 2026-06-17 — run: claude login".to_string());
+        assert_eq!(
+            state_diag_message("Claude", &s),
+            Some("Claude: Expired on 2026-06-17 — run: claude login".to_string())
+        );
+    }
+
+    #[test]
+    fn diag_message_ok_is_none() {
+        let s = UsageState::Ok(vec![], Some("max".to_string()));
+        assert_eq!(state_diag_message("Claude", &s), None);
+    }
+
+    #[test]
+    fn diag_message_not_configured_is_none() {
+        assert_eq!(state_diag_message("Copilot", &UsageState::NotConfigured), None);
     }
 }
