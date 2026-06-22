@@ -158,7 +158,7 @@ impl ApplicationHandler for App {
 
         if Local::now() >= self.next_update_check_after {
             self.update_available = update_check::check();
-            self.next_update_check_after = Local::now() + chrono::Duration::hours(24);
+            self.next_update_check_after = Local::now() + chrono::Duration::hours(settings::UPDATE_CHECK_INTERVAL_HOURS);
             if !did_refresh {
                 self.refresh_all(false);
                 did_refresh = true;
@@ -269,7 +269,7 @@ fn main() {
         last_refreshed_at: None,
         settings,
         backoff,
-        next_update_check_after: Local::now() + chrono::Duration::hours(24),
+        next_update_check_after: Local::now() + chrono::Duration::hours(settings::UPDATE_CHECK_INTERVAL_HOURS),
         update_available: None,
     };
     event_loop.run_app(&mut app).expect("event loop error");

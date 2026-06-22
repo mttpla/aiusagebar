@@ -4,6 +4,7 @@ pub(crate) const DEFAULT_POLL_INTERVAL: Duration       = Duration::from_secs(300
 pub(crate) const DEFAULT_ALERT_THRESHOLD_PCT: f32      = 80.0;
 pub(crate) const DEFAULT_BACKOFF_FACTOR: u32           = 2;
 pub(crate) const DEFAULT_BACKOFF_CAP: Duration         = Duration::from_secs(3600);
+pub(crate) const UPDATE_CHECK_INTERVAL_HOURS: i64      = 24;
 
 pub(crate) struct Settings {
     pub(crate) poll_interval:       Duration,
