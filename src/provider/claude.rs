@@ -191,7 +191,10 @@ impl ClaudeProvider {
 
 fn fetch_profile(token: &str, ua: &str) -> Option<ProfileData> {
     let (result, _) = crate::http::get(PROFILE_URL, token, &[("User-Agent", ua)]);
-    result.ok().and_then(|body| parse_profile_response(&body).ok())
+    let body = result.ok()?;
+    parse_profile_response(&body)
+        .inspect_err(|e| crate::diag!(crate::diag::Level::Err, "Claude profile parse failed: {}", e))
+        .ok()
 }
 
 fn do_fetch(
@@ -234,9 +237,11 @@ fn do_fetch(
             }
         },
         Err(HttpError::Unauthorized) => {
+            crate::diag!(crate::diag::Level::Err, "Claude usage fetch unauthorized (401) at {}", USAGE_URL);
             (UsageState::Stale("Token rejected — run: claude login".to_string()), Some(HttpError::Unauthorized))
         }
         Err(HttpError::RateLimited) => {
+            crate::diag!(crate::diag::Level::Err, "Claude usage fetch rate limited (429) at {}", USAGE_URL);
             let state = last_ok
                 .lock()
                 .unwrap()
@@ -245,8 +250,14 @@ fn do_fetch(
                 .unwrap_or_else(|| UsageState::Error("Rate limited (no cache)".to_string()));
             (state, Some(HttpError::RateLimited))
         }
-        Err(HttpError::ServerError(c)) => (UsageState::Error(format!("Server error {c}")), Some(HttpError::ServerError(c))),
-        Err(HttpError::Other(e)) => (UsageState::Error(e), None),
+        Err(HttpError::ServerError(c)) => {
+            crate::diag!(crate::diag::Level::Err, "Claude usage fetch server error {} at {}", c, USAGE_URL);
+            (UsageState::Error(format!("Server error {c}")), Some(HttpError::ServerError(c)))
+        }
+        Err(HttpError::Other(e)) => {
+            crate::diag!(crate::diag::Level::Err, "Claude usage fetch failed at {}: {}", USAGE_URL, e);
+            (UsageState::Error(e), None)
+        }
     }
 }
 
