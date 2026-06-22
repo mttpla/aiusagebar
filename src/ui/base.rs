@@ -1,4 +1,27 @@
 use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem, Submenu};
+use crate::provider::ProviderKind;
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum OtherEntry {
+    Provider(ProviderKind),
+    Diagnostics,
+    Placeholder,
+}
+
+/// Decides what appears inside the "Other ▶" submenu, in order:
+/// one entry per provider that has raw JSON, then Diagnostics when the diag
+/// log is non-empty, then a single Placeholder if nothing else would show.
+pub(crate) fn other_entries(details_kinds: &[ProviderKind], diag_empty: bool) -> Vec<OtherEntry> {
+    let mut entries: Vec<OtherEntry> =
+        details_kinds.iter().map(|k| OtherEntry::Provider(*k)).collect();
+    if !diag_empty {
+        entries.push(OtherEntry::Diagnostics);
+    }
+    if entries.is_empty() {
+        entries.push(OtherEntry::Placeholder);
+    }
+    entries
+}
 
 pub(crate) struct FooterIds {
     pub(crate) refresh: MenuId,
@@ -43,4 +66,44 @@ pub(crate) fn append_other(menu: &Menu) -> Option<MenuId> {
     };
     menu.append(&other).expect("menu append failed");
     copy_id
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::provider::ProviderKind;
+
+    #[test]
+    fn entries_both_providers_and_diag() {
+        let got = other_entries(&[ProviderKind::Claude, ProviderKind::Copilot], false);
+        assert_eq!(
+            got,
+            vec![
+                OtherEntry::Provider(ProviderKind::Claude),
+                OtherEntry::Provider(ProviderKind::Copilot),
+                OtherEntry::Diagnostics,
+            ]
+        );
+    }
+
+    #[test]
+    fn entries_provider_without_raw_json_omitted() {
+        let got = other_entries(&[ProviderKind::Claude], false);
+        assert_eq!(
+            got,
+            vec![OtherEntry::Provider(ProviderKind::Claude), OtherEntry::Diagnostics]
+        );
+    }
+
+    #[test]
+    fn entries_diag_empty_omits_diagnostics() {
+        let got = other_entries(&[ProviderKind::Claude], true);
+        assert_eq!(got, vec![OtherEntry::Provider(ProviderKind::Claude)]);
+    }
+
+    #[test]
+    fn entries_nothing_present_falls_back_to_placeholder() {
+        let got = other_entries(&[], true);
+        assert_eq!(got, vec![OtherEntry::Placeholder]);
+    }
 }
