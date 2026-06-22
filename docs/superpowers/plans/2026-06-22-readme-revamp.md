@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, shields.io badges, MIT license text, macOS screenshot capture.
 
+> **Progress — 2026-06-22:** Tasks 2, 3, 6, 7, 8 done and pushed to `master` (LICENSE + license metadata; badges; Configuration section; Rust→Development; Releasing rewrite; License section). The `COPILOT_GITHUB_TOKEN` block was moved out of Keychain into Configuration as part of this pass. **Remaining:** Task 1 (human captures `gatekeeper-prompt.png` + `keychain-prompt.png` — agent cannot screenshot system dialogs), then Tasks 4 (Install + Gatekeeper screenshot) and 5 (Keychain screenshot embed). Card stays in `doing` until those land.
+
 ## Global Constraints
 
 - Provider names are **Claude** and **Copilot** only. First mention may say "Claude (Anthropic)" / "Copilot (GitHub)"; subsequent mentions use the primary name. No "OpenAI" / "Codex" / "Anthropic" / "GitHub" as a primary provider name.
