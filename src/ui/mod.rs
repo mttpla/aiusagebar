@@ -74,6 +74,7 @@ pub(crate) fn build_menu(
     states: &[(ProviderKind, &UsageState)],
     last_updated: Option<&str>,
     update: Option<&str>,
+    details_kinds: &[ProviderKind],
 ) -> MenuBuild {
     let menu = Menu::new();
 
@@ -90,23 +91,19 @@ pub(crate) fn build_menu(
 
     let mut setup_claude: Option<MenuId> = None;
     let mut setup_copilot: Option<MenuId> = None;
-    let mut details_claude: Option<MenuId> = None;
-    let mut details_copilot: Option<MenuId> = None;
     for (kind, state) in states {
         match kind {
             ProviderKind::Claude => {
-                let (sc, dc) = claude::append_claude_section(&menu, state);
+                let (sc, _dc) = claude::append_claude_section(&menu, state);
                 setup_claude = sc;
-                details_claude = Some(dc);
             }
             ProviderKind::Copilot => {
-                let (sc, dc) = copilot::append_copilot_section(&menu, state);
+                let (sc, _dc) = copilot::append_copilot_section(&menu, state);
                 setup_copilot = sc;
-                details_copilot = Some(dc);
             }
         }
     }
-    let copy_diag = base::append_other(&menu);
+    let other = base::append_other(&menu, details_kinds);
     let footer = base::append_footer(&menu);
     let layout = build_layout(states, last_updated, update);
 
@@ -124,9 +121,9 @@ pub(crate) fn build_menu(
         update: update_id,
         setup_claude,
         setup_copilot,
-        details_claude,
-        details_copilot,
-        copy_diag,
+        details_claude: other.details_claude,
+        details_copilot: other.details_copilot,
+        copy_diag: other.copy_diag,
     }
 }
 

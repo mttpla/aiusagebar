@@ -46,26 +46,51 @@ pub(crate) fn append_footer(menu: &Menu) -> FooterIds {
     }
 }
 
-/// Appends the always-visible "Other ▶" submenu. When the diagnostic log has
-/// entries it contains "Diagnostics ▶ Copy diagnostic log" and returns the copy
-/// item's id; when empty it shows a disabled "No diagnostics" placeholder and
-/// returns None.
-pub(crate) fn append_other(menu: &Menu) -> Option<MenuId> {
+pub(crate) struct OtherIds {
+    pub(crate) details_claude: Option<MenuId>,
+    pub(crate) details_copilot: Option<MenuId>,
+    pub(crate) copy_diag: Option<MenuId>,
+}
+
+/// Appends the always-present "Other ▶" submenu. Contains a "Provider ▶ Details…"
+/// entry for each provider in `details_kinds`, then "Diagnostics ▶ Copy diagnostic
+/// log" when the diag log is non-empty, and a disabled "No diagnostics" placeholder
+/// only when nothing else would appear.
+pub(crate) fn append_other(menu: &Menu, details_kinds: &[ProviderKind]) -> OtherIds {
     let other = Submenu::new("Other", true);
-    let copy_id = if crate::diag::is_empty() {
-        let placeholder = MenuItem::new("No diagnostics", false, None);
-        other.append(&placeholder).expect("menu append failed");
-        None
-    } else {
-        let diagnostics = Submenu::new("Diagnostics", true);
-        let copy = MenuItem::new("Copy diagnostic log", true, None);
-        let id = copy.id().clone();
-        diagnostics.append(&copy).expect("menu append failed");
-        other.append(&diagnostics).expect("menu append failed");
-        Some(id)
-    };
+    let mut details_claude: Option<MenuId> = None;
+    let mut details_copilot: Option<MenuId> = None;
+    let mut copy_diag: Option<MenuId> = None;
+
+    for entry in other_entries(details_kinds, crate::diag::is_empty()) {
+        match entry {
+            OtherEntry::Provider(kind) => {
+                let sub = Submenu::new(kind.display_name(), true);
+                let item = MenuItem::new("Details\u{2026}", true, None);
+                let id = item.id().clone();
+                sub.append(&item).expect("menu append failed");
+                other.append(&sub).expect("menu append failed");
+                match kind {
+                    ProviderKind::Claude => details_claude = Some(id),
+                    ProviderKind::Copilot => details_copilot = Some(id),
+                }
+            }
+            OtherEntry::Diagnostics => {
+                let diagnostics = Submenu::new("Diagnostics", true);
+                let copy = MenuItem::new("Copy diagnostic log", true, None);
+                copy_diag = Some(copy.id().clone());
+                diagnostics.append(&copy).expect("menu append failed");
+                other.append(&diagnostics).expect("menu append failed");
+            }
+            OtherEntry::Placeholder => {
+                let placeholder = MenuItem::new("No diagnostics", false, None);
+                other.append(&placeholder).expect("menu append failed");
+            }
+        }
+    }
+
     menu.append(&other).expect("menu append failed");
-    copy_id
+    OtherIds { details_claude, details_copilot, copy_diag }
 }
 
 #[cfg(test)]
