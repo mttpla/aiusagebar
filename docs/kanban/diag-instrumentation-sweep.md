@@ -18,7 +18,8 @@ useful. The macro auto-injects `file!():line!()` — callers only write the mess
 - `src/http.rs` — all `HttpError` variants (Status, RateLimited, Network, etc.)
 - `src/keychain.rs` — token read failures, malformed JSON
 - `src/provider/claude.rs` — any error paths not already covered by #44 hook points
-- Future providers (Copilot, Codex) — instrument at the time they are written
+- `src/provider/copilot.rs` — per-account parse + HTTP error arms in `do_copilot_fetch`
+- Future providers (Codex) — instrument at the time they are written
 
 ## Out of scope
 
@@ -40,3 +41,11 @@ useful. The macro auto-injects `file!():line!()` — callers only write the mess
   Architecture decision: `inspect_err` at call sites preferred over logging methods on
   error types (error types lack URL/provider context). `diag!` macro handles file+line
   automatically.
+- 2026-06-22: Copilot provider was found already built (multi-account), so it was pulled
+  into scope at the user's request — the original "future provider, out of scope" note was
+  stale. Plan written: docs/superpowers/plans/2026-06-22-diag-instrumentation-sweep.md.
+  Also confirmed #44 already instrumented http::get() (all status arms) and claude.rs
+  malformed-creds + parse paths, so the sweep only fills the remaining silent paths:
+  keychain read failures (skipping errSecItemNotFound), http::get_public, claude HTTP-error
+  arms + profile parse, and copilot per-account arms. HTTP both-layers decision: http::get
+  logs status+URL+body; provider call sites add operation/provider context.

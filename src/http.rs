@@ -66,17 +66,25 @@ pub(crate) fn get_public(url: &str) -> Result<String, HttpError> {
         .get(url)
         .header("User-Agent", concat!("aiusagebar/", env!("CARGO_PKG_VERSION")))
         .call()
-        .map_err(|e| HttpError::Other(e.to_string()))?;
-    match resp.status().as_u16() {
-        200 => resp
-            .into_body()
-            .read_to_string()
-            .map_err(|e| HttpError::Other(e.to_string())),
+        .map_err(|e| {
+            crate::diag!(crate::diag::Level::Err, "HTTP request to {} failed: {}", url, e);
+            HttpError::Other(e.to_string())
+        })?;
+    let status = resp.status().as_u16();
+    let result = match status {
+        200 => resp.into_body().read_to_string().map_err(|e| {
+            crate::diag!(crate::diag::Level::Err, "Reading body from {} failed: {}", url, e);
+            HttpError::Other(e.to_string())
+        }),
         401 => Err(HttpError::Unauthorized),
         429 => Err(HttpError::RateLimited),
         c @ 500..=599 => Err(HttpError::ServerError(c)),
         code => Err(HttpError::Other(format!("HTTP {}", code))),
+    };
+    if result.is_err() && status != 200 {
+        crate::diag!(crate::diag::Level::Err, "HTTP {} from {}", status, url);
     }
+    result
 }
 
 #[cfg(test)]
