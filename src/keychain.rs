@@ -90,8 +90,30 @@ pub(crate) fn enumerate_generic_passwords(service: &str) -> Vec<(String, String)
                     None
                 }
             })?;
-            let password = get_generic_password(service, &account).ok()?;
-            String::from_utf8(password).ok().map(|p| (account, p))
+            let password = match get_generic_password(service, &account) {
+                Ok(p) => p,
+                Err(e) => {
+                    if keychain_error_is_loggable(e.code()) {
+                        crate::diag!(
+                            crate::diag::Level::Err,
+                            "Keychain read failed for service {} account {} (status {}): {}",
+                            service, account, e.code(), e
+                        );
+                    }
+                    return None;
+                }
+            };
+            match String::from_utf8(password) {
+                Ok(p) => Some((account, p)),
+                Err(e) => {
+                    crate::diag!(
+                        crate::diag::Level::Err,
+                        "Keychain item for service {} account {} is not valid UTF-8: {}",
+                        service, account, e
+                    );
+                    None
+                }
+            }
         })
         .collect()
 }

@@ -1,8 +1,10 @@
 ---
 id: 51
-status: backlog
+status: done
 priority: Normal
 tags: [robustness, logging, diag, pre-1.0]
+spec: superpowers/specs/2026-06-22-non-provider-diag-gaps-design.md
+plan: superpowers/plans/2026-06-22-non-provider-diag-gaps.md
 created: 2026-06-22
 updated: 2026-06-22
 ---
@@ -34,3 +36,13 @@ Silent paths to instrument:
   only) and defer these non-provider paths here. Per-leaf instrumentation is appropriate
   here since there is no single boundary that covers them. Lightweight card — promote to
   spec/plan only when picked up.
+- 2026-06-22: Moved to doing. Brainstormed: level convention = all Err, drop benign
+  (launch_at_login bootstrap-warning + debug-skip stay on eprintln). Dropped #3
+  profile-None as already-traced (HTTP + parse causes already logged). No dedup
+  (one-shot sites). Skip ErrorKind::NotFound on cred-file read (file absent = token in
+  Keychain). Spec + plan written.
+- 2026-06-22: Done. Implemented subagent-driven in 2 commits (bfc69df cred-file +
+  Keychain enumerate logging with io_error_is_loggable helper + 2 tests; 87fb52f
+  update-check parse + tray set_icon + 4 open-spawn + enable() error). Both task reviews
+  clean (spec ✅ quality ✅). 2 Minor style nits (cred-file msg style, duplicate e.code())
+  non-blocking. Gate green: clippy -D warnings clean, 191 tests pass. Merged to master.

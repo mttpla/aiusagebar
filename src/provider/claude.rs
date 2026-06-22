@@ -43,13 +43,27 @@ pub(crate) fn load_credentials() -> CredLoad {
     parse_credentials_payload(load_credentials_json())
 }
 
+/// True for credential-file IO errors worth logging — genuine read failures, not the
+/// expected `NotFound` that simply means the file is absent (token lives in the Keychain).
+fn io_error_is_loggable(e: &std::io::Error) -> bool {
+    e.kind() != std::io::ErrorKind::NotFound
+}
+
 fn load_credentials_json() -> Option<String> {
     let account = std::env::var("USER").unwrap_or_else(|_| "unknown".to_string());
     if let Some(json) = crate::keychain::read_generic_password("Claude Code-credentials", &account) {
         return Some(json);
     }
     let path = dirs::home_dir()?.join(".claude").join(".credentials.json");
-    std::fs::read_to_string(path).ok()
+    match std::fs::read_to_string(&path) {
+        Ok(json) => Some(json),
+        Err(e) => {
+            if io_error_is_loggable(&e) {
+                crate::diag!(crate::diag::Level::Err, "Reading {} failed: {}", path.display(), e);
+            }
+            None
+        }
+    }
 }
 
 pub(crate) fn is_expired(expires_at_ms: u64) -> bool {
@@ -651,5 +665,17 @@ mod tests {
             None,
         );
         assert!(raw_cache.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn io_error_not_found_is_not_loggable() {
+        let e = std::io::Error::from(std::io::ErrorKind::NotFound);
+        assert!(!super::io_error_is_loggable(&e));
+    }
+
+    #[test]
+    fn io_error_permission_denied_is_loggable() {
+        let e = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        assert!(super::io_error_is_loggable(&e));
     }
 }

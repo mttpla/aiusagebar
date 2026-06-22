@@ -7,7 +7,13 @@ struct GithubRelease {
 }
 
 pub(crate) fn parse_release(json: &str) -> Option<String> {
-    let release: GithubRelease = serde_json::from_str(json).ok()?;
+    let release: GithubRelease = match serde_json::from_str(json) {
+        Ok(r) => r,
+        Err(e) => {
+            crate::diag!(crate::diag::Level::Err, "Update check: malformed releases JSON: {}", e);
+            return None;
+        }
+    };
     if release.assets.is_empty() {
         return None;
     }
