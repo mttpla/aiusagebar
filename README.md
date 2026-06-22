@@ -11,9 +11,10 @@ Read-only monitor. Never sends prompts, never spends quota, never modifies crede
 
 ---
 
-## Installation
+## Install
 
-Download `aiusagebar-macos-arm64-vX.Y.Z` from [GitHub Releases](https://github.com/mttpla/aiusagebar/releases), then:
+Download `aiusagebar-macos-arm64-vX.Y.Z` from the
+[Releases page](https://github.com/mttpla/aiusagebar/releases/latest), then:
 
 ```bash
 chmod +x aiusagebar-macos-arm64-vX.Y.Z
@@ -21,12 +22,23 @@ mv aiusagebar-macos-arm64-vX.Y.Z /usr/local/bin/aiusagebar   # or any directory 
 aiusagebar &
 ```
 
-**First launch — Gatekeeper warning:** macOS blocks unsigned downloads. Two workarounds (pick one):
+No Rust toolchain and no Xcode required.
 
-- Right-click the binary in Finder → **Open** → confirm in the dialog.
-- Or from Terminal: `xattr -dr com.apple.quarantine /usr/local/bin/aiusagebar`
+### First launch — Gatekeeper
 
-After the first launch the warning never appears again.
+The binary is unsigned, so macOS blocks it the first time. Launch it once, dismiss
+the warning, then open **System Settings → Privacy & Security**, scroll to the
+*"aiusagebar was blocked"* row and click **Open Anyway**.
+
+![Open Anyway in Privacy & Security](assets/gatekeeper-prompt.png)
+
+Prefer the terminal? Clear the quarantine flag instead:
+
+```bash
+xattr -dr com.apple.quarantine /usr/local/bin/aiusagebar
+```
+
+After this the warning never appears again.
 
 ---
 
@@ -76,11 +88,37 @@ Icons by [Font Awesome](https://fontawesome.com) (CC BY 4.0).
 
 ## Keychain access
 
-Claude token lives in the macOS Keychain (created by Claude Code). First read triggers a system dialog — click **Always Allow** once. Nothing is ever written back.
+**Why:** macOS sandboxes Keychain items per creating app. AIUsageBar is not
+Claude Code, so reading Claude's stored OAuth token requires your explicit
+consent. The first read triggers a system dialog — click **Always Allow** once.
+
+![Keychain access dialog](assets/keychain-prompt.png)
+
+**What:** only the Claude OAuth access token (Keychain item service
+`Claude Code-credentials`, account = your macOS username, JSON value with
+`claudeAiOauth.accessToken`). Fallback if the Keychain item is unavailable:
+`~/.claude/.credentials.json` (created by Claude Code).
+
+**Where it never goes:** the token is never written, never logged, and never
+sent anywhere except `api.anthropic.com` for the documented usage/profile
+endpoints.
 
 ---
 
 ## Troubleshooting
+
+### "aiusagebar can't be opened" (only **Move to Trash**)
+
+If you double-click the binary, macOS shows a dead-end dialog with just **Move to
+Trash** and **Done** — no way to open it.
+
+![Blocked dialog with Move to Trash](assets/gatekeeper-blocked.png)
+
+**Do not click Move to Trash.** Click **Done**, then unblock the binary using either
+path from [First launch — Gatekeeper](#first-launch--gatekeeper): **System Settings →
+Privacy & Security → Open Anyway**, or `xattr -dr com.apple.quarantine <path>`.
+
+### Reporting a provider error
 
 If a provider row shows an error, open **Other ▶ Diagnostics ▶ Copy diagnostic log**
 to copy the full diagnostic log to your clipboard. Paste it into a GitHub issue or email
