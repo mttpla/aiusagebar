@@ -1,9 +1,10 @@
 ---
 id: 57
-status: todo
+status: done
 priority: Normal
 tags: [kanban, tooling, docs]
 spec: superpowers/specs/2026-06-23-kanban-folder-restructure-design.md
+plan: superpowers/plans/2026-06-23-kanban-folder-restructure.md
 created: 2026-06-23
 updated: 2026-06-23
 ---
@@ -45,3 +46,14 @@ filenames, and rewrite the kanban skill to match.
   must match migrated layout or next card drifts. Spec committed at
   `superpowers/specs/2026-06-23-kanban-folder-restructure-design.md`. Next:
   writing-plans.
+- 2026-06-23: Executed via subagent-driven-development on branch
+  `chore/kanban-folder-restructure`. Task 1 (migration): 57 cards `git mv`d into
+  status subfolders (backlog 19, todo 3, doing 0, done 33, archive 2); verified
+  count, status==folder, pure renames (100% similarity, no content edits). Note:
+  count was 57 not the plan's 56 — this very card was added after the spec.
+  zsh gotcha: `status` is a read-only special var, renamed loop vars to `st`/`cr`.
+  Task 2 (skill rewrite): 6 edits to `~/.claude/skills/kanban-skill/SKILL.md`
+  (filename rule, folder invariant, create/move/board/query ops, intro, workflow
+  step 4); verified no stale `<slug>.md` refs and live board matches documented
+  format. Subagent dispatch was bash-permission-blocked, so both tasks run inline.
+  Moved to `done`.
