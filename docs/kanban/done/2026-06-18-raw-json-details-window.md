@@ -1,11 +1,11 @@
 ---
 id: 45
-status: todo
+status: done
 priority: Normal
 tags: [ui, debug, providers]
 spec: specs/2026-06-18-raw-json-details-window.md
 created: 2026-06-18
-updated: 2026-06-18
+updated: 2026-06-23
 ---
 # Raw JSON details window
 
@@ -27,3 +27,10 @@ Add a "Details…" menu item to each provider section (Claude, Copilot). Clickin
     "No data yet" if never fetched.
   - Rejected: embedding raw JSON in UsageState (wrong semantics), per-account
     submenus (too many indices to track), history of responses (only last needed).
+- 2026-06-23: Closed to `done` — feature shipped. Implemented across commits
+  `0d5aa22` (Details menu item per provider section) and `d85f105` (wire Details
+  to the raw HTTP response window). Live in code: `src/details.rs` window module,
+  `raw_json()` trait method consumed in `main.rs`, providers cache the raw body.
+  Subsequently refined by card #48 (`details-submenu`), which moved the Details
+  items into the "Other" submenu — the underlying raw-JSON feature is this card.
+  Card was left in `todo` by oversight; verified done via git log + source.
