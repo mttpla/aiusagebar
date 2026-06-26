@@ -1,11 +1,12 @@
 ---
 id: 58
-status: todo
+status: doing
 priority: High
 tags: [claude, provider, parsing, enterprise]
 spec: superpowers/specs/2026-06-26-claude-enterprise-usage-parse-design.md
+plan: superpowers/plans/2026-06-27-claude-enterprise-usage-parse-plan.md
 created: 2026-06-26
-updated: 2026-06-26
+updated: 2026-06-27
 ---
 # Claude enterprise usage parse — dual-shape support
 
@@ -53,3 +54,12 @@ plan label.
   anonymized (names/email/UUIDs redacted) as the canonical base, with `max`,
   `enterprise`, and `fallback` derived from it. Enterprise usage fixture taken
   verbatim from the bug log. Updated `updated` to 2026-06-26.
+- 2026-06-27: Moved todo → doing. Wrote implementation plan
+  (`superpowers/plans/2026-06-27-claude-enterprise-usage-parse-plan.md`), 3 tasks
+  (money fields + view; optional usage structs + Spend parse; plan label from
+  organization_type). Key constraint baked in: each task bundles new struct
+  fields with a non-test reader so per-task `clippy -D warnings` passes
+  (no-allow-dead-code rule). User supplied a second, richer real enterprise body
+  (many null/codename windows + nested `extra_usage`/`spend.cap`); added as
+  `USAGE_ENTERPRISE_FULL` regression fixture asserting all extra keys ignored →
+  single Spend window, budget $50.00 (amount_minor 5000 / exponent 2).
