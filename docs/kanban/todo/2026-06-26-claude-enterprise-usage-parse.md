@@ -48,3 +48,8 @@ plan label.
     formatting. (User explicitly asked for these.)
   - Scope: single card (not split) — the three pieces (parse, plan label, view)
     are needed together for "enterprise displayed well".
+- 2026-06-26: Test fixtures pinned in the spec. User supplied the real `pro`
+  profile (four pasted blobs were identical — all `claude_pro`); embedded
+  anonymized (names/email/UUIDs redacted) as the canonical base, with `max`,
+  `enterprise`, and `fallback` derived from it. Enterprise usage fixture taken
+  verbatim from the bug log. Updated `updated` to 2026-06-26.

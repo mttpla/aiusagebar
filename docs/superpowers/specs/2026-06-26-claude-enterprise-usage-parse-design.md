@@ -128,11 +128,37 @@ Enterprise user result: one row — **Spend — 0.0% · $0.00 / $50.00**.
 
 ### Mock fixtures (string consts in test module)
 
-- Profile: `pro` (the observed dump), `max`, `enterprise` (best-guess
-  `organization_type: "claude_enterprise"`, both `has_*` flags false).
-- Usage: Pro/Max shape (`five_hour` + `seven_day` objects), enterprise shape
-  (`five_hour`/`seven_day` null + `spend`, plus a codename window to assert it
-  is ignored).
+All personal data is redacted: names → `"User"`, email → `user@example.com`,
+all UUIDs → `00000000-0000-0000-0000-000000000000`.
+
+**Profile — `pro`** (the observed real dump, anonymized; canonical base):
+
+```json
+{"account":{"uuid":"00000000-0000-0000-0000-000000000000","full_name":"User","display_name":"User","email":"user@example.com","has_claude_max":false,"has_claude_pro":true,"created_at":"2025-04-03T14:32:38.156445Z"},"organization":{"uuid":"00000000-0000-0000-0000-000000000000","name":"User's Organization","organization_type":"claude_pro","billing_type":"stripe_subscription","rate_limit_tier":"default_claude_ai","seat_tier":null,"has_extra_usage_enabled":false,"subscription_status":"active","subscription_created_at":"2026-03-28T17:23:26.890085Z","cc_onboarding_flags":{},"claude_code_trial_ends_at":null,"claude_code_trial_duration_days":null,"payment_auth_hosted_invoice_url":null,"claude_ai_completion_feedback_enabled":true},"application":{"uuid":"00000000-0000-0000-0000-000000000000","name":"Claude Code","slug":"claude-code"},"enabled_plugins":[]}
+```
+
+**Profile — `max`**: the `pro` fixture with `organization_type: "claude_max"`,
+`has_claude_max: true`, `has_claude_pro: false`.
+
+**Profile — `enterprise`** (best-guess, exact value unconfirmed):
+`organization_type: "claude_enterprise"`, both `has_*` flags `false`. The
+strip-prefix mapping makes the test robust to the real value.
+
+**Profile — `fallback`**: `organization_type` absent/empty → exercises the
+`has_claude_*` fallback.
+
+**Usage — Pro/Max** (`five_hour` + `seven_day` objects):
+
+```json
+{"five_hour":{"utilization":12.5,"resets_at":"2026-06-26T22:00:00+00:00"},"seven_day":{"utilization":40.0,"resets_at":"2026-07-01T00:00:00+00:00"}}
+```
+
+**Usage — enterprise** (real body from the bug log; null windows + `spend`,
+plus a codename window to assert it is ignored):
+
+```json
+{"five_hour":null,"seven_day":null,"cinder_cove":{"utilization":1.3e-06,"resets_at":"2026-09-21T07:09:14.289383+00:00","limit_dollars":1000,"used_dollars":1.3e-05,"remaining_dollars":999.999987},"limits":[],"spend":{"used":{"amount_minor":0,"currency":"USD","exponent":2},"limit":{"amount_minor":5000,"currency":"USD","exponent":2},"percent":0,"severity":"normal","enabled":true}}
+```
 
 ### Tests
 
