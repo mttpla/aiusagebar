@@ -173,6 +173,25 @@ fn format_reset(window: &crate::provider::LimitWindow) -> String {
     }
 }
 
+fn format_money(spent: f64, budget: f64, currency: &str) -> String {
+    let sym = if currency == "USD" {
+        "$".to_string()
+    } else {
+        format!("{} ", currency)
+    };
+    format!("{sym}{spent:.2} / {sym}{budget:.2}")
+}
+
+fn format_detail(window: &crate::provider::LimitWindow) -> String {
+    match (window.spent, window.budget) {
+        (Some(spent), Some(budget)) => {
+            let currency = window.currency.as_deref().unwrap_or("USD");
+            format_money(spent, budget, currency)
+        }
+        _ => format_reset(window),
+    }
+}
+
 unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2::rc::Retained<NSView> {
     use objc2::MainThreadMarker;
     use objc2_app_kit::NSBoxType;
@@ -247,7 +266,7 @@ unsafe fn make_progress_row_view(window: &crate::provider::LimitWindow) -> objc2
     }
 
     // detail line — gray 10.5pt, bottom
-    let detail = format_reset(window);
+    let detail = format_detail(window);
     if !detail.is_empty() {
         let detail_field = NSTextField::labelWithString(&NSString::from_str(&detail), mtm);
         detail_field.setFont(Some(&NSFont::systemFontOfSize(10.5)));
@@ -483,5 +502,30 @@ mod tests {
     fn format_reset_unparseable_falls_back_to_raw() {
         let w = make_window("monthly", None, Some("not-a-date"));
         assert_eq!(format_reset(&w), "resets not-a-date");
+    }
+
+    #[test]
+    fn format_money_usd_uses_dollar_symbol() {
+        assert_eq!(super::format_money(0.0, 50.0, "USD"), "$0.00 / $50.00");
+    }
+
+    #[test]
+    fn format_money_non_usd_prefixes_currency_code() {
+        assert_eq!(super::format_money(1.5, 20.0, "EUR"), "EUR 1.50 / EUR 20.00");
+    }
+
+    #[test]
+    fn format_detail_money_present_formats_dollars() {
+        let mut w = make_window("Spend", Some(0.0), None);
+        w.spent = Some(0.0);
+        w.budget = Some(50.0);
+        w.currency = Some("USD".to_string());
+        assert_eq!(super::format_detail(&w), "$0.00 / $50.00");
+    }
+
+    #[test]
+    fn format_detail_money_absent_falls_back_to_reset() {
+        let w = make_window("7d weekly", Some(15.0), Some("2026-07-01T00:00:00+00:00"));
+        assert_eq!(super::format_detail(&w), super::format_reset(&w));
     }
 }

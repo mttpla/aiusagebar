@@ -77,10 +77,7 @@ mod tests {
         LimitWindow {
             name: "t".into(),
             percent_used: pct,
-            limit: None,
-            remaining: None,
-            resets_at: None,
-            unlimited: false,
+            ..Default::default()
         }
     }
 
@@ -173,10 +170,8 @@ mod tests {
         let w = LimitWindow {
             name: "t".into(),
             percent_used: Some(90.0),
-            limit: None,
-            remaining: None,
-            resets_at: None,
             unlimited: true,
+            ..Default::default()
         };
         let s = UsageState::Ok(vec![w], None);
         assert_eq!(IconKind::for_state(&s, 80.0), IconKind::Alert);

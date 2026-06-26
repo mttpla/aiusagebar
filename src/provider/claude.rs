@@ -156,18 +156,14 @@ fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
         LimitWindow {
             name: "5h session".to_string(),
             percent_used: Some(resp.five_hour.utilization),
-            limit: None,
-            remaining: None,
             resets_at: resp.five_hour.resets_at,
-            unlimited: false,
+            ..Default::default()
         },
         LimitWindow {
             name: "7d weekly".to_string(),
             percent_used: Some(resp.seven_day.utilization),
-            limit: None,
-            remaining: None,
             resets_at: resp.seven_day.resets_at,
-            unlimited: false,
+            ..Default::default()
         },
     ])
 }
@@ -516,10 +512,7 @@ mod tests {
         let cache = Mutex::new(Some(vec![LimitWindow {
             name: "5h session".to_string(),
             percent_used: Some(42.0),
-            limit: None,
-            remaining: None,
-            resets_at: None,
-            unlimited: false,
+            ..Default::default()
         }]));
         let (state, _) = super::do_fetch(ok_creds(), &|_| (Err(HttpError::RateLimited), None), &cache, &Mutex::new(None), None);
         assert!(matches!(state, UsageState::Ok(ref w, _) if w[0].percent_used == Some(42.0)));
@@ -606,10 +599,7 @@ mod tests {
         let cache = Mutex::new(Some(vec![LimitWindow {
             name: "5h session".to_string(),
             percent_used: Some(42.0),
-            limit: None,
-            remaining: None,
-            resets_at: None,
-            unlimited: false,
+            ..Default::default()
         }]));
         let (state, _) = super::do_fetch(
             ok_creds(),

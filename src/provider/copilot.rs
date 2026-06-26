@@ -40,7 +40,7 @@ fn parse_copilot_response(body: &str) -> Result<Vec<LimitWindow>, String> {
             limit,
             remaining,
             resets_at: resets_at.clone(),
-            unlimited: false,
+            ..Default::default()
         });
     }
 
@@ -106,21 +106,13 @@ pub(crate) fn do_copilot_fetch(
         for account in stale_accounts {
             ok_windows.push(LimitWindow {
                 name: format!("@{} — token expired, re-login", account),
-                percent_used: None,
-                limit: None,
-                remaining: None,
-                resets_at: None,
-                unlimited: false,
+                ..Default::default()
             });
         }
         for msg in error_msgs {
             ok_windows.push(LimitWindow {
                 name: msg,
-                percent_used: None,
-                limit: None,
-                remaining: None,
-                resets_at: None,
-                unlimited: false,
+                ..Default::default()
             });
         }
         return (UsageState::Ok(ok_windows, None), backoff_err, raw_json);

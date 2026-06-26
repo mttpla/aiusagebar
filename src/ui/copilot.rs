@@ -64,10 +64,8 @@ mod tests {
         LimitWindow {
             name: name.to_owned(),
             percent_used: pct,
-            limit: None,
-            remaining: None,
             resets_at: resets_at.map(str::to_owned),
-            unlimited: false,
+            ..Default::default()
         }
     }
 

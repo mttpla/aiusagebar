@@ -9,6 +9,9 @@ pub(crate) struct LimitWindow {
     pub(crate) remaining: Option<u32>,
     pub(crate) resets_at: Option<String>,
     pub(crate) unlimited: bool,
+    pub(crate) spent: Option<f64>,
+    pub(crate) budget: Option<f64>,
+    pub(crate) currency: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
