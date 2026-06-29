@@ -466,6 +466,26 @@ mod tests {
     // two utilization windows and NO Spend window.
     const USAGE_PRO_FULL: &str = r#"{"five_hour":{"utilization":7.0,"resets_at":"2026-06-29T21:49:59.976791+00:00","limit_dollars":null,"used_dollars":null,"remaining_dollars":null},"seven_day":{"utilization":12.0,"resets_at":"2026-06-29T17:59:59.976820+00:00","limit_dollars":null,"used_dollars":null,"remaining_dollars":null},"seven_day_oauth_apps":null,"seven_day_opus":null,"seven_day_sonnet":null,"seven_day_cowork":null,"seven_day_omelette":null,"tangelo":null,"iguana_necktie":null,"omelette_promotional":null,"cinder_cove":null,"amber_ladder":null,"extra_usage":{"is_enabled":false,"monthly_limit":null,"used_credits":null,"utilization":null,"currency":null,"decimal_places":null,"disabled_reason":null,"daily":null,"weekly":null},"limits":[{"kind":"session","group":"session","percent":7,"severity":"normal","resets_at":"2026-06-29T21:49:59.976791+00:00","scope":null,"is_active":false},{"kind":"weekly_all","group":"weekly","percent":12,"severity":"normal","resets_at":"2026-06-29T17:59:59.976820+00:00","scope":null,"is_active":true}],"spend":{"used":{"amount_minor":0,"currency":"USD","exponent":2},"limit":null,"percent":0,"severity":"normal","enabled":false,"disabled_reason":null,"cap":null,"balance":null,"auto_reload":null,"disclaimer":"Usage credits cover you when you hit your plan limits.","can_purchase_credits":false,"can_toggle":false},"member_dashboard_available":false}"#;
 
+    // Smoke guard: every real captured /api/oauth/usage body must deserialize
+    // without turning into a parse error. Independent of per-window content
+    // assertions — this is the regression net for "a real plan body broke the
+    // parser" (e.g. Pro's `spend.limit:null` once did).
+    #[test]
+    fn parse_real_bodies_never_error() {
+        let bodies = [
+            ("PRO_MAX", USAGE_PRO_MAX),
+            ("PRO_FULL", USAGE_PRO_FULL),
+            ("ENTERPRISE", USAGE_ENTERPRISE),
+            ("ENTERPRISE_FULL", USAGE_ENTERPRISE_FULL),
+        ];
+        for (label, body) in bodies {
+            assert!(
+                super::parse_response(body).is_ok(),
+                "real {label} body must parse without error"
+            );
+        }
+    }
+
     #[test]
     fn parse_pro_full_disabled_spend_yields_two_windows_no_spend() {
         let windows = super::parse_response(USAGE_PRO_FULL).unwrap();
