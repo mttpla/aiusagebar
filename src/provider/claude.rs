@@ -117,8 +117,14 @@ struct ProfileAccount {
 }
 
 #[derive(Deserialize)]
+struct ProfileOrganization {
+    organization_type: Option<String>,
+}
+
+#[derive(Deserialize)]
 struct ProfileResponse {
     account: ProfileAccount,
+    organization: Option<ProfileOrganization>,
 }
 
 struct ProfileData {
@@ -126,15 +132,31 @@ struct ProfileData {
     plan: String,
 }
 
-fn plan_label(has_max: bool, has_pro: bool) -> &'static str {
-    if has_max { "max" } else if has_pro { "pro" } else { "free" }
+fn plan_label(org_type: Option<&str>, has_max: bool, has_pro: bool) -> String {
+    if let Some(stripped) = org_type.and_then(|t| t.strip_prefix("claude_")) {
+        if !stripped.is_empty() {
+            return stripped.to_string();
+        }
+    }
+    if has_max {
+        "max".to_string()
+    } else if has_pro {
+        "pro".to_string()
+    } else {
+        "free".to_string()
+    }
 }
 
 fn parse_profile_response(body: &str) -> Result<ProfileData, String> {
     let resp: ProfileResponse = serde_json::from_str(body).map_err(|e| e.to_string())?;
+    let org_type = resp
+        .organization
+        .as_ref()
+        .and_then(|o| o.organization_type.as_deref());
+    let plan = plan_label(org_type, resp.account.has_claude_max, resp.account.has_claude_pro);
     Ok(ProfileData {
         email: resp.account.email,
-        plan: plan_label(resp.account.has_claude_max, resp.account.has_claude_pro).to_string(),
+        plan,
     })
 }
 
@@ -654,6 +676,41 @@ mod tests {
     #[test]
     fn parse_profile_missing_account_field_is_error() {
         assert!(super::parse_profile_response("{}").is_err());
+    }
+
+    const PROFILE_PRO: &str = r#"{"account":{"uuid":"00000000-0000-0000-0000-000000000000","full_name":"User","display_name":"User","email":"user@example.com","has_claude_max":false,"has_claude_pro":true,"created_at":"2025-04-03T14:32:38.156445Z"},"organization":{"uuid":"00000000-0000-0000-0000-000000000000","name":"User's Organization","organization_type":"claude_pro","billing_type":"stripe_subscription","seat_tier":null},"application":{"uuid":"00000000-0000-0000-0000-000000000000","name":"Claude Code","slug":"claude-code"},"enabled_plugins":[]}"#;
+
+    const PROFILE_ENTERPRISE: &str = r#"{"account":{"email":"user@example.com","has_claude_max":false,"has_claude_pro":false},"organization":{"organization_type":"claude_enterprise"}}"#;
+
+    #[test]
+    fn parse_profile_pro_from_organization_type() {
+        let pd = super::parse_profile_response(PROFILE_PRO).unwrap();
+        assert_eq!(pd.email, "user@example.com");
+        assert_eq!(pd.plan, "pro");
+    }
+
+    #[test]
+    fn parse_profile_enterprise_from_organization_type() {
+        let pd = super::parse_profile_response(PROFILE_ENTERPRISE).unwrap();
+        assert_eq!(pd.plan, "enterprise");
+    }
+
+    #[test]
+    fn plan_label_strips_claude_prefix() {
+        assert_eq!(super::plan_label(Some("claude_max"), false, false), "max");
+        assert_eq!(super::plan_label(Some("claude_enterprise"), false, false), "enterprise");
+    }
+
+    #[test]
+    fn plan_label_falls_back_when_org_type_missing_or_empty() {
+        // missing -> use flags
+        assert_eq!(super::plan_label(None, true, false), "max");
+        assert_eq!(super::plan_label(None, false, true), "pro");
+        assert_eq!(super::plan_label(None, false, false), "free");
+        // empty after strip -> use flags
+        assert_eq!(super::plan_label(Some("claude_"), false, true), "pro");
+        // non-claude prefix -> use flags
+        assert_eq!(super::plan_label(Some("team"), false, false), "free");
     }
 
     #[test]
