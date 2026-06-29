@@ -177,7 +177,8 @@ struct WindowData {
 struct SpendData {
     percent: f32,
     used: Money,
-    limit: Money,
+    limit: Option<Money>,
+    enabled: bool,
 }
 
 #[derive(Deserialize)]
@@ -211,14 +212,18 @@ fn parse_response(body: &str) -> Result<Vec<LimitWindow>, String> {
         });
     }
     if let Some(s) = resp.spend {
-        windows.push(LimitWindow {
-            name: "Spend".to_string(),
-            percent_used: Some(s.percent),
-            spent: Some(money_to_dollars(&s.used)),
-            budget: Some(money_to_dollars(&s.limit)),
-            currency: Some(s.used.currency),
-            ..Default::default()
-        });
+        // Pro/Max also carry a `spend` object, but with `enabled:false` and a
+        // null limit — only enterprise accounts have an active spend budget.
+        if let (true, Some(limit)) = (s.enabled, s.limit) {
+            windows.push(LimitWindow {
+                name: "Spend".to_string(),
+                percent_used: Some(s.percent),
+                spent: Some(money_to_dollars(&s.used)),
+                budget: Some(money_to_dollars(&limit)),
+                currency: Some(s.used.currency),
+                ..Default::default()
+            });
+        }
     }
     Ok(windows)
 }
@@ -455,6 +460,22 @@ mod tests {
     // nested objects (extra_usage, spend.cap) — all must be ignored. spend limit
     // amount_minor 5000 / exponent 2 -> $50.00.
     const USAGE_ENTERPRISE_FULL: &str = r#"{"five_hour":null,"seven_day":null,"seven_day_oauth_apps":null,"seven_day_opus":null,"seven_day_sonnet":null,"seven_day_cowork":null,"seven_day_omelette":null,"tangelo":null,"iguana_necktie":null,"omelette_promotional":{"utilization":0.0,"resets_at":null,"limit_dollars":null,"used_dollars":null,"remaining_dollars":null},"cinder_cove":{"utilization":1.2999999999999998e-06,"resets_at":"2026-09-21T07:09:14.289383+00:00","limit_dollars":1000,"used_dollars":1.3e-05,"remaining_dollars":999.999987},"amber_ladder":{"utilization":0.0,"resets_at":"2026-09-02T06:59:59+00:00","limit_dollars":25000,"used_dollars":0.0,"remaining_dollars":25000.0},"extra_usage":{"is_enabled":true,"monthly_limit":5000,"used_credits":0.0,"utilization":null,"currency":"USD","decimal_places":2,"disabled_reason":null,"daily":null,"weekly":null},"limits":[],"spend":{"used":{"amount_minor":0,"currency":"USD","exponent":2},"limit":{"amount_minor":5000,"currency":"USD","exponent":2},"percent":0,"severity":"normal","enabled":true,"disabled_reason":null,"cap":{"money":null,"credits":{"amount_minor":5000,"exponent":2}},"balance":null,"auto_reload":null,"disclaimer":"Usage credits cover you when you hit your plan limits.","can_purchase_credits":false,"can_toggle":false}}"#;
+
+    // Real PRO body: five_hour/seven_day present (with extra null money keys),
+    // plus a spend object with `enabled:false` and `limit:null`. Must yield the
+    // two utilization windows and NO Spend window.
+    const USAGE_PRO_FULL: &str = r#"{"five_hour":{"utilization":7.0,"resets_at":"2026-06-29T21:49:59.976791+00:00","limit_dollars":null,"used_dollars":null,"remaining_dollars":null},"seven_day":{"utilization":12.0,"resets_at":"2026-06-29T17:59:59.976820+00:00","limit_dollars":null,"used_dollars":null,"remaining_dollars":null},"seven_day_oauth_apps":null,"seven_day_opus":null,"seven_day_sonnet":null,"seven_day_cowork":null,"seven_day_omelette":null,"tangelo":null,"iguana_necktie":null,"omelette_promotional":null,"cinder_cove":null,"amber_ladder":null,"extra_usage":{"is_enabled":false,"monthly_limit":null,"used_credits":null,"utilization":null,"currency":null,"decimal_places":null,"disabled_reason":null,"daily":null,"weekly":null},"limits":[{"kind":"session","group":"session","percent":7,"severity":"normal","resets_at":"2026-06-29T21:49:59.976791+00:00","scope":null,"is_active":false},{"kind":"weekly_all","group":"weekly","percent":12,"severity":"normal","resets_at":"2026-06-29T17:59:59.976820+00:00","scope":null,"is_active":true}],"spend":{"used":{"amount_minor":0,"currency":"USD","exponent":2},"limit":null,"percent":0,"severity":"normal","enabled":false,"disabled_reason":null,"cap":null,"balance":null,"auto_reload":null,"disclaimer":"Usage credits cover you when you hit your plan limits.","can_purchase_credits":false,"can_toggle":false},"member_dashboard_available":false}"#;
+
+    #[test]
+    fn parse_pro_full_disabled_spend_yields_two_windows_no_spend() {
+        let windows = super::parse_response(USAGE_PRO_FULL).unwrap();
+        assert_eq!(windows.len(), 2, "disabled/null-limit spend must not add a window");
+        assert_eq!(windows[0].name, "5h session");
+        assert_eq!(windows[0].percent_used, Some(7.0));
+        assert_eq!(windows[1].name, "7d weekly");
+        assert_eq!(windows[1].percent_used, Some(12.0));
+        assert!(windows.iter().all(|w| w.name != "Spend"));
+    }
 
     #[test]
     fn parse_pro_max_yields_two_windows_no_money() {
