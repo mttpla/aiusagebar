@@ -140,8 +140,9 @@ fn parse_profile_response(body: &str) -> Result<ProfileData, String> {
 
 #[derive(Deserialize)]
 struct UsageResponse {
-    five_hour: WindowData,
-    seven_day: WindowData,
+    five_hour: Option<WindowData>,
+    seven_day: Option<WindowData>,
+    spend: Option<SpendData>,
 }
 
 #[derive(Deserialize)]
@@ -150,22 +151,54 @@ struct WindowData {
     resets_at: Option<String>,
 }
 
-fn parse_response(body: &str) -> Result<[LimitWindow; 2], String> {
+#[derive(Deserialize)]
+struct SpendData {
+    percent: f32,
+    used: Money,
+    limit: Money,
+}
+
+#[derive(Deserialize)]
+struct Money {
+    amount_minor: i64,
+    exponent: u32,
+    currency: String,
+}
+
+fn money_to_dollars(m: &Money) -> f64 {
+    m.amount_minor as f64 / 10f64.powi(m.exponent as i32)
+}
+
+fn parse_response(body: &str) -> Result<Vec<LimitWindow>, String> {
     let resp: UsageResponse = serde_json::from_str(body).map_err(|e| e.to_string())?;
-    Ok([
-        LimitWindow {
+    let mut windows = Vec::new();
+    if let Some(w) = resp.five_hour {
+        windows.push(LimitWindow {
             name: "5h session".to_string(),
-            percent_used: Some(resp.five_hour.utilization),
-            resets_at: resp.five_hour.resets_at,
+            percent_used: Some(w.utilization),
+            resets_at: w.resets_at,
             ..Default::default()
-        },
-        LimitWindow {
+        });
+    }
+    if let Some(w) = resp.seven_day {
+        windows.push(LimitWindow {
             name: "7d weekly".to_string(),
-            percent_used: Some(resp.seven_day.utilization),
-            resets_at: resp.seven_day.resets_at,
+            percent_used: Some(w.utilization),
+            resets_at: w.resets_at,
             ..Default::default()
-        },
-    ])
+        });
+    }
+    if let Some(s) = resp.spend {
+        windows.push(LimitWindow {
+            name: "Spend".to_string(),
+            percent_used: Some(s.percent),
+            spent: Some(money_to_dollars(&s.used)),
+            budget: Some(money_to_dollars(&s.limit)),
+            currency: Some(s.used.currency),
+            ..Default::default()
+        });
+    }
+    Ok(windows)
 }
 
 fn last_ok_summary(windows: &[LimitWindow]) -> String {
@@ -233,7 +266,6 @@ fn do_fetch(
     match result {
         Ok(body) => match parse_response(&body) {
             Ok(windows) => {
-                let windows = windows.to_vec();
                 *last_ok.lock().unwrap() = Some(windows.clone());
                 (UsageState::Ok(windows, profile_string), None)
             }
@@ -386,16 +418,75 @@ mod tests {
     }
 
     #[test]
-    fn parse_missing_field_is_error() {
-        assert!(super::parse_response("{}").is_err());
-    }
-
-    #[test]
     fn parse_response_null_resets_at_is_ok() {
         let body = r#"{"five_hour":{"utilization":10.0,"resets_at":null},"seven_day":{"utilization":5.0,"resets_at":null}}"#;
         let windows = super::parse_response(body).unwrap();
         assert_eq!(windows[0].resets_at, None);
         assert_eq!(windows[1].resets_at, None);
+    }
+
+    const USAGE_PRO_MAX: &str = r#"{"five_hour":{"utilization":12.5,"resets_at":"2026-06-26T22:00:00+00:00"},"seven_day":{"utilization":40.0,"resets_at":"2026-07-01T00:00:00+00:00"}}"#;
+
+    const USAGE_ENTERPRISE: &str = r#"{"five_hour":null,"seven_day":null,"cinder_cove":{"utilization":1.3e-06,"resets_at":"2026-09-21T07:09:14.289383+00:00","limit_dollars":1000,"used_dollars":1.3e-05,"remaining_dollars":999.999987},"limits":[],"spend":{"used":{"amount_minor":0,"currency":"USD","exponent":2},"limit":{"amount_minor":5000,"currency":"USD","exponent":2},"percent":0,"severity":"normal","enabled":true}}"#;
+
+    // Richer real enterprise body: many extra null/codename windows plus deeply
+    // nested objects (extra_usage, spend.cap) — all must be ignored. spend limit
+    // amount_minor 5000 / exponent 2 -> $50.00.
+    const USAGE_ENTERPRISE_FULL: &str = r#"{"five_hour":null,"seven_day":null,"seven_day_oauth_apps":null,"seven_day_opus":null,"seven_day_sonnet":null,"seven_day_cowork":null,"seven_day_omelette":null,"tangelo":null,"iguana_necktie":null,"omelette_promotional":{"utilization":0.0,"resets_at":null,"limit_dollars":null,"used_dollars":null,"remaining_dollars":null},"cinder_cove":{"utilization":1.2999999999999998e-06,"resets_at":"2026-09-21T07:09:14.289383+00:00","limit_dollars":1000,"used_dollars":1.3e-05,"remaining_dollars":999.999987},"amber_ladder":{"utilization":0.0,"resets_at":"2026-09-02T06:59:59+00:00","limit_dollars":25000,"used_dollars":0.0,"remaining_dollars":25000.0},"extra_usage":{"is_enabled":true,"monthly_limit":5000,"used_credits":0.0,"utilization":null,"currency":"USD","decimal_places":2,"disabled_reason":null,"daily":null,"weekly":null},"limits":[],"spend":{"used":{"amount_minor":0,"currency":"USD","exponent":2},"limit":{"amount_minor":5000,"currency":"USD","exponent":2},"percent":0,"severity":"normal","enabled":true,"disabled_reason":null,"cap":{"money":null,"credits":{"amount_minor":5000,"exponent":2}},"balance":null,"auto_reload":null,"disclaimer":"Usage credits cover you when you hit your plan limits.","can_purchase_credits":false,"can_toggle":false}}"#;
+
+    #[test]
+    fn parse_pro_max_yields_two_windows_no_money() {
+        let windows = super::parse_response(USAGE_PRO_MAX).unwrap();
+        assert_eq!(windows.len(), 2);
+        assert_eq!(windows[0].name, "5h session");
+        assert_eq!(windows[0].percent_used, Some(12.5));
+        assert_eq!(windows[0].resets_at.as_deref(), Some("2026-06-26T22:00:00+00:00"));
+        assert_eq!(windows[1].name, "7d weekly");
+        assert_eq!(windows[1].percent_used, Some(40.0));
+        assert!(windows[0].spent.is_none() && windows[0].budget.is_none());
+        assert!(windows[1].spent.is_none() && windows[1].budget.is_none());
+    }
+
+    #[test]
+    fn parse_enterprise_yields_single_spend_window() {
+        let windows = super::parse_response(USAGE_ENTERPRISE).unwrap();
+        assert_eq!(windows.len(), 1, "enterprise must produce exactly one window");
+        let w = &windows[0];
+        assert_eq!(w.name, "Spend");
+        assert_eq!(w.percent_used, Some(0.0));
+        assert_eq!(w.spent, Some(0.0));
+        assert_eq!(w.budget, Some(50.0));
+        assert_eq!(w.currency.as_deref(), Some("USD"));
+    }
+
+    #[test]
+    fn parse_enterprise_full_ignores_extra_keys_single_spend_window() {
+        let windows = super::parse_response(USAGE_ENTERPRISE_FULL).unwrap();
+        assert_eq!(windows.len(), 1, "extra null/codename/nested keys must be ignored");
+        let w = &windows[0];
+        assert_eq!(w.name, "Spend");
+        assert_eq!(w.percent_used, Some(0.0));
+        assert_eq!(w.spent, Some(0.0));
+        assert_eq!(w.budget, Some(50.0));
+        assert_eq!(w.currency.as_deref(), Some("USD"));
+    }
+
+    #[test]
+    fn parse_money_minor_units_to_dollars() {
+        // amount_minor 5000, exponent 2 -> 50.0
+        let windows = super::parse_response(USAGE_ENTERPRISE).unwrap();
+        assert_eq!(windows[0].budget, Some(50.0));
+    }
+
+    #[test]
+    fn parse_empty_object_yields_no_windows() {
+        let windows = super::parse_response("{}").unwrap();
+        assert!(windows.is_empty());
+    }
+
+    #[test]
+    fn parse_malformed_json_is_error() {
+        assert!(super::parse_response("not json").is_err());
     }
 
     #[test]
