@@ -1,12 +1,12 @@
 ---
 id: 58
-status: doing
+status: done
 priority: High
 tags: [claude, provider, parsing, enterprise]
 spec: superpowers/specs/2026-06-26-claude-enterprise-usage-parse-design.md
 plan: superpowers/plans/2026-06-27-claude-enterprise-usage-parse-plan.md
 created: 2026-06-26
-updated: 2026-06-27
+updated: 2026-06-29
 ---
 # Claude enterprise usage parse — dual-shape support
 
@@ -63,3 +63,10 @@ plan label.
   (many null/codename windows + nested `extra_usage`/`spend.cap`); added as
   `USAGE_ENTERPRISE_FULL` regression fixture asserting all extra keys ignored →
   single Spend window, budget $50.00 (amount_minor 5000 / exponent 2).
+- 2026-06-29: All 3 tasks implemented (TDD) and committed: Task 1 `d7d3eac`
+  (money fields + money-aware detail line), Task 2 `d0a5565` (optional
+  `five_hour`/`seven_day`/`spend` structs, `parse_response` → `Vec<LimitWindow>`,
+  enterprise crash fixed), Task 3 `c44192d` (plan label from `organization_type`
+  with `has_claude_*` fallback). 209 tests pass, clippy clean. Moved doing → done.
+  Live manual acceptance on a real enterprise account still pending (no test
+  account available).
