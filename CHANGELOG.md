@@ -1,5 +1,37 @@
 # Changelog
 
+## [v1.1.0] - 2026-06-30
+
+### Bug Fixes
+
+- Tolerate disabled spend on Pro/Max usage body
+
+### Documentation
+
+- Kanban folder restructure — status subfolders + date-prefixed filenames
+- Add plan, close card 57 to done
+- Close raw-json-details-window card #45 to done
+- Claude enterprise usage parse — dual-shape support
+- Add card #58 Claude enterprise usage parse
+- Pin anonymized test fixtures for enterprise usage parse
+- Move to doing, add implementation plan
+- Close to done — enterprise usage parse implemented
+- Document Claude Pro/Max vs Enterprise usage in README; close card
+
+### Features
+
+- Add money fields to LimitWindow and money-aware detail line
+- Parse enterprise spend window via optional usage structs
+- Derive plan label from organization_type with flag fallback
+
+### Refactoring
+
+- Migrate cards into status subfolders with date-prefixed filenames
+
+### Tests
+
+- Smoke-guard that every real usage body parses
+
 ## [v1.0.0] - 2026-06-22
 
 ### Documentation
