@@ -44,10 +44,17 @@ After this the warning never appears again.
 
 ## Providers
 
-| Provider | Limit windows                       |
-|----------|-------------------------------------|
-| Claude   | 5h session · 7d weekly              |
-| Copilot  | Monthly premium quota (per account) |
+| Provider            | Limit windows                       |
+|---------------------|-------------------------------------|
+| Claude (Pro / Max)  | 5h session · 7d weekly              |
+| Claude (Enterprise) | Spend (dollar budget used / limit)  |
+| Copilot             | Monthly premium quota (per account) |
+
+The Claude row adapts to the account type. **Pro / Max** plans report two
+rolling utilization windows (`5h session`, `7d weekly`). **Enterprise** plans
+don't expose those windows — instead they report a `Spend` budget, so AIUsageBar
+shows dollars used against the dollar limit. The plan label shown in the menu is
+derived from the account's `organization_type`.
 
 Per-provider states: **Not configured** · **Stale** (renew via official client) · **OK** · **Error**.
 

@@ -6,7 +6,7 @@ tags: [claude, provider, parsing, enterprise]
 spec: superpowers/specs/2026-06-26-claude-enterprise-usage-parse-design.md
 plan: superpowers/plans/2026-06-27-claude-enterprise-usage-parse-plan.md
 created: 2026-06-26
-updated: 2026-06-29
+updated: 2026-06-30
 ---
 # Claude enterprise usage parse — dual-shape support
 
@@ -70,3 +70,8 @@ plan label.
   with `has_claude_*` fallback). 209 tests pass, clippy clean. Moved doing → done.
   Live manual acceptance on a real enterprise account still pending (no test
   account available).
+- 2026-06-30: Updated README Providers table — split the Claude row into
+  `Pro / Max` (5h session · 7d weekly) and `Enterprise` (Spend dollar budget),
+  added an explanatory note on the dual shape and plan-label derivation from
+  `organization_type`. Card file moved doing → done (status field was already
+  `done`). Closing the card.
