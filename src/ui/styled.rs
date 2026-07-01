@@ -122,13 +122,30 @@ fn refresh_attr_str(updated: Option<&str>) -> Retained<NSMutableAttributedString
 
 // ── Progress bar helpers ───────────────────────────────────────────────────
 
-fn bar_fill_color(pct: f32) -> Retained<NSColor> {
+/// Bar fill color zone, selected by percent used. Pure classification split out
+/// from color construction so the threshold logic is testable without AppKit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BarZone {
+    Green,
+    Amber,
+    Red,
+}
+
+fn bar_zone(pct: f32) -> BarZone {
     if pct < crate::settings::BAR_WARN_PCT {
-        srgb(0.204, 0.780, 0.349) // #34C759 green
+        BarZone::Green
     } else if pct <= crate::settings::BAR_ALERT_PCT {
-        srgb(1.0, 0.624, 0.039)   // #FF9F0A amber
+        BarZone::Amber
     } else {
-        srgb(1.0, 0.231, 0.188)   // #FF3B30 red
+        BarZone::Red
+    }
+}
+
+fn bar_fill_color(pct: f32) -> Retained<NSColor> {
+    match bar_zone(pct) {
+        BarZone::Green => srgb(0.204, 0.780, 0.349), // #34C759 green
+        BarZone::Amber => srgb(1.0, 0.624, 0.039),   // #FF9F0A amber
+        BarZone::Red => srgb(1.0, 0.231, 0.188),     // #FF3B30 red
     }
 }
 
@@ -334,6 +351,45 @@ pub(super) fn style_menu(menu: &Menu, layout: &MenuLayout) {
 mod tests {
     use super::*;
     use crate::provider::LimitWindow;
+
+    // ── Bar color zone thresholds (pure classification) ──────────────────
+
+    #[test]
+    fn bar_zone_zero_is_green() {
+        assert_eq!(bar_zone(0.0), BarZone::Green);
+    }
+
+    #[test]
+    fn bar_zone_just_below_warn_is_green() {
+        assert_eq!(bar_zone(crate::settings::BAR_WARN_PCT - 0.1), BarZone::Green);
+    }
+
+    #[test]
+    fn bar_zone_at_warn_boundary_is_amber() {
+        // `< BAR_WARN_PCT` is green, so the boundary value itself is amber.
+        assert_eq!(bar_zone(crate::settings::BAR_WARN_PCT), BarZone::Amber);
+    }
+
+    #[test]
+    fn bar_zone_between_boundaries_is_amber() {
+        assert_eq!(bar_zone(70.0), BarZone::Amber);
+    }
+
+    #[test]
+    fn bar_zone_at_alert_boundary_is_amber() {
+        // `<= BAR_ALERT_PCT` is amber, so the boundary value is still amber.
+        assert_eq!(bar_zone(crate::settings::BAR_ALERT_PCT), BarZone::Amber);
+    }
+
+    #[test]
+    fn bar_zone_just_above_alert_is_red() {
+        assert_eq!(bar_zone(crate::settings::BAR_ALERT_PCT + 0.1), BarZone::Red);
+    }
+
+    #[test]
+    fn bar_zone_hundred_is_red() {
+        assert_eq!(bar_zone(100.0), BarZone::Red);
+    }
 
     // ── Footer item text (pure fns — no main thread required) ─────────────
 
