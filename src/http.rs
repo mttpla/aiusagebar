@@ -1,5 +1,4 @@
 use std::sync::OnceLock;
-use std::time::Duration;
 use ureq::tls::{TlsConfig, TlsProvider};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -18,7 +17,7 @@ fn agent() -> &'static ureq::Agent {
     static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
     AGENT.get_or_init(|| {
         ureq::Agent::config_builder()
-            .timeout_global(Some(Duration::from_secs(15)))
+            .timeout_global(Some(crate::settings::HTTP_TIMEOUT))
             .http_status_as_error(false)
             .tls_config(TlsConfig::builder().provider(TlsProvider::NativeTls).build())
             .build()
