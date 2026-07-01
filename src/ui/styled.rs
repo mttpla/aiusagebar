@@ -123,9 +123,9 @@ fn refresh_attr_str(updated: Option<&str>) -> Retained<NSMutableAttributedString
 // ── Progress bar helpers ───────────────────────────────────────────────────
 
 fn bar_fill_color(pct: f32) -> Retained<NSColor> {
-    if pct < 60.0 {
+    if pct < crate::settings::BAR_WARN_PCT {
         srgb(0.204, 0.780, 0.349) // #34C759 green
-    } else if pct <= 80.0 {
+    } else if pct <= crate::settings::BAR_ALERT_PCT {
         srgb(1.0, 0.624, 0.039)   // #FF9F0A amber
     } else {
         srgb(1.0, 0.231, 0.188)   // #FF3B30 red

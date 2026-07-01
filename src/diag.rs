@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
-const CAPACITY: usize = 100;
 const MAX_MSG_BYTES: usize = 2048;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,7 +28,7 @@ struct Entry {
 static DIAG: OnceLock<Mutex<VecDeque<Entry>>> = OnceLock::new();
 
 fn buffer() -> &'static Mutex<VecDeque<Entry>> {
-    DIAG.get_or_init(|| Mutex::new(VecDeque::with_capacity(CAPACITY)))
+    DIAG.get_or_init(|| Mutex::new(VecDeque::with_capacity(crate::settings::DIAG_LOG_MAX_MESSAGES)))
 }
 
 /// Truncates `s` to at most `max_bytes`, respecting char boundaries, appending
@@ -61,7 +60,7 @@ fn make_entry(level: Level, msg: String, time: String) -> Entry {
 /// Appends `entry`, evicting the oldest when at capacity. Operates on a passed
 /// buffer so the capacity logic is testable without the process-global state.
 fn push_entry(buf: &mut VecDeque<Entry>, entry: Entry) {
-    if buf.len() == CAPACITY {
+    if buf.len() == crate::settings::DIAG_LOG_MAX_MESSAGES {
         buf.pop_front();
     }
     buf.push_back(entry);
@@ -149,9 +148,9 @@ mod tests {
         for i in 0..120 {
             push_entry(&mut buf, make_entry(Level::Info, format!("entry {i}"), "t".to_string()));
         }
-        assert_eq!(buf.len(), CAPACITY, "buffer must cap at {CAPACITY}");
+        assert_eq!(buf.len(), crate::settings::DIAG_LOG_MAX_MESSAGES, "buffer must cap at {}", crate::settings::DIAG_LOG_MAX_MESSAGES);
         let all = format_buf(&buf);
-        assert_eq!(all.lines().count(), CAPACITY);
+        assert_eq!(all.lines().count(), crate::settings::DIAG_LOG_MAX_MESSAGES);
         assert!(!all.contains("entry 0"), "oldest entry must be evicted");
         assert!(all.contains("entry 119"), "newest entry must be present");
         assert!(all.contains("INF"), "level label must be present");

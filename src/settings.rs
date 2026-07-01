@@ -6,6 +6,15 @@ pub(crate) const DEFAULT_BACKOFF_FACTOR: u32           = 2;
 pub(crate) const DEFAULT_BACKOFF_CAP: Duration         = Duration::from_secs(3600);
 pub(crate) const DEFAULT_UPDATE_CHECK_INTERVAL_HOURS: i64 = 24;
 
+/// HTTP request timeout for the shared ureq agent.
+pub(crate) const HTTP_TIMEOUT: Duration = Duration::from_secs(15);
+/// Max messages retained in the in-memory diagnostic log ring buffer.
+pub(crate) const DIAG_LOG_MAX_MESSAGES: usize = 100;
+/// Progress-bar color zone boundaries (percent). Separate from the icon/notify
+/// alert threshold — these drive bar fill color only.
+pub(crate) const BAR_WARN_PCT: f32 = 60.0;
+pub(crate) const BAR_ALERT_PCT: f32 = 80.0;
+
 pub(crate) struct Settings {
     pub(crate) poll_interval:       Duration,
     pub(crate) alert_threshold_pct: f32,
