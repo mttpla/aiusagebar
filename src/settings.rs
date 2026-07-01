@@ -4,13 +4,14 @@ pub(crate) const DEFAULT_POLL_INTERVAL: Duration       = Duration::from_secs(300
 pub(crate) const DEFAULT_ALERT_THRESHOLD_PCT: f32      = 80.0;
 pub(crate) const DEFAULT_BACKOFF_FACTOR: u32           = 2;
 pub(crate) const DEFAULT_BACKOFF_CAP: Duration         = Duration::from_secs(3600);
-pub(crate) const UPDATE_CHECK_INTERVAL_HOURS: i64      = 24;
+pub(crate) const DEFAULT_UPDATE_CHECK_INTERVAL_HOURS: i64 = 24;
 
 pub(crate) struct Settings {
     pub(crate) poll_interval:       Duration,
     pub(crate) alert_threshold_pct: f32,
     pub(crate) backoff_factor:      u32,
     pub(crate) backoff_cap:         Duration,
+    pub(crate) update_check_interval_hours: i64,
 }
 
 impl Default for Settings {
@@ -20,6 +21,7 @@ impl Default for Settings {
             alert_threshold_pct: DEFAULT_ALERT_THRESHOLD_PCT,
             backoff_factor:      DEFAULT_BACKOFF_FACTOR,
             backoff_cap:         DEFAULT_BACKOFF_CAP,
+            update_check_interval_hours: DEFAULT_UPDATE_CHECK_INTERVAL_HOURS,
         }
     }
 }
@@ -46,5 +48,10 @@ mod tests {
     #[test]
     fn default_backoff_cap_is_one_hour() {
         assert_eq!(Settings::default().backoff_cap, Duration::from_secs(3600));
+    }
+
+    #[test]
+    fn default_update_check_interval_is_24_hours() {
+        assert_eq!(Settings::default().update_check_interval_hours, 24);
     }
 }

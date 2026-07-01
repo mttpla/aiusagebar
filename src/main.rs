@@ -158,7 +158,7 @@ impl ApplicationHandler for App {
 
         if Local::now() >= self.next_update_check_after {
             self.update_available = update_check::check();
-            self.next_update_check_after = Local::now() + chrono::Duration::hours(settings::UPDATE_CHECK_INTERVAL_HOURS);
+            self.next_update_check_after = Local::now() + chrono::Duration::hours(self.settings.update_check_interval_hours);
             if !did_refresh {
                 self.refresh_all(false);
                 did_refresh = true;
@@ -247,6 +247,7 @@ fn main() {
         .expect("failed to create tray icon");
 
     let settings = Settings::default();
+    let update_check_interval_hours = settings.update_check_interval_hours;
     let backoff = BackoffState::new(
         settings.poll_interval,
         settings.backoff_factor,
@@ -269,7 +270,7 @@ fn main() {
         last_refreshed_at: None,
         settings,
         backoff,
-        next_update_check_after: Local::now() + chrono::Duration::hours(settings::UPDATE_CHECK_INTERVAL_HOURS),
+        next_update_check_after: Local::now() + chrono::Duration::hours(update_check_interval_hours),
         update_available: None,
     };
     event_loop.run_app(&mut app).expect("event loop error");
