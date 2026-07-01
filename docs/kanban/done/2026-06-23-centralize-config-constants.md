@@ -1,6 +1,6 @@
 ---
 id: 56
-status: doing
+status: done
 priority: Normal
 tags: [refactor, config, settings]
 created: 2026-06-23
@@ -50,3 +50,9 @@ Promoting Tier B to live fields needs global/fn plumbing — out of scope.
   styled.rs bar-color zones (60/80) into settings.rs as `BAR_*` consts, rename
   diag `CAPACITY` → `DIAG_LOG_MAX_MESSAGES`. Split check: single atomic card, no
   split.
+- 2026-07-01: Done. Two commits — 4c85ce9 (promote update-check interval to a
+  Settings field) + a77e77d (four Tier B consts: HTTP_TIMEOUT,
+  DIAG_LOG_MAX_MESSAGES, BAR_WARN_PCT, BAR_ALERT_PCT + rewire consumers). Both
+  task reviews Approved, `cargo clippy -- -D warnings && cargo test` green (212).
+  Minor deferred: `=` column-alignment of DEFAULT_UPDATE_CHECK_INTERVAL_HOURS
+  const (longer name breaks sibling alignment).
