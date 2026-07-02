@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 pub(crate) const DEFAULT_POLL_INTERVAL: Duration       = Duration::from_secs(300);
-pub(crate) const DEFAULT_ALERT_THRESHOLD_PCT: f32      = 80.0;
+/// Default threshold (percent) that flips the tray icon to its alert state.
+/// Icon/notify only — bar fill color uses BAR_WARN_PCT / BAR_ALERT_PCT.
+pub(crate) const DEFAULT_ICON_ALERT_PCT: f32           = 80.0;
 pub(crate) const DEFAULT_BACKOFF_FACTOR: u32           = 2;
 pub(crate) const DEFAULT_BACKOFF_CAP: Duration         = Duration::from_secs(3600);
 pub(crate) const DEFAULT_UPDATE_CHECK_INTERVAL_HOURS: i64 = 24;
@@ -17,7 +19,7 @@ pub(crate) const BAR_ALERT_PCT: f32 = 80.0;
 
 pub(crate) struct Settings {
     pub(crate) poll_interval:       Duration,
-    pub(crate) alert_threshold_pct: f32,
+    pub(crate) icon_alert_pct: f32,
     pub(crate) backoff_factor:      u32,
     pub(crate) backoff_cap:         Duration,
     pub(crate) update_check_interval_hours: i64,
@@ -27,7 +29,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             poll_interval:       DEFAULT_POLL_INTERVAL,
-            alert_threshold_pct: DEFAULT_ALERT_THRESHOLD_PCT,
+            icon_alert_pct: DEFAULT_ICON_ALERT_PCT,
             backoff_factor:      DEFAULT_BACKOFF_FACTOR,
             backoff_cap:         DEFAULT_BACKOFF_CAP,
             update_check_interval_hours: DEFAULT_UPDATE_CHECK_INTERVAL_HOURS,
@@ -46,7 +48,7 @@ mod tests {
 
     #[test]
     fn default_alert_threshold_is_eighty_percent() {
-        assert_eq!(Settings::default().alert_threshold_pct, 80.0_f32);
+        assert_eq!(Settings::default().icon_alert_pct, 80.0_f32);
     }
 
     #[test]
