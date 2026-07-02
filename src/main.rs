@@ -105,7 +105,7 @@ impl App {
             self.backoff.on_success();
         }
         let state_refs: Vec<&UsageState> = states.iter().map(|(_, s)| s).collect();
-        let icon_kind = IconKind::for_providers(&state_refs, self.settings.alert_threshold_pct);
+        let icon_kind = IconKind::for_providers(&state_refs, self.settings.icon_alert_pct);
         let refs: Vec<(ProviderKind, &UsageState)> =
             states.iter().map(|(k, s)| (*k, s)).collect();
         let details_kinds: Vec<ProviderKind> = refs
